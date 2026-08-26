@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>케어톡 · 병상 의사소통 (서울시 입원환자용 AAC 어휘 반영)</title>
+<style>
+  :root{
+    --ink:#0b1620;        /* 야간 병실에서도 눈부심 적은 깊은 배경 */
+    --ink-2:#11202e;
+    --surface:#16293a;
+    --surface-2:#1e3850;
+    --line:#27465f;
+    --text:#eef6fb;
+    --text-dim:#9fbace;
+    --heal:#5eead4;       /* 스캐닝 하이라이트(치유의 청록) */
+    --heal-soft:#2dd4bf;
+    --catch:#fbbf24;      /* '잡기' 시그니처 색(따뜻한 호박) */
+    --catch-deep:#f59e0b;
+    --danger:#fb7185;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;background:radial-gradient(120% 120% at 50% -10%,#14283a 0%,var(--ink) 55%);
+    color:var(--text);
+    font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none;
+    display:flex;flex-direction:column;min-height:100dvh;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;color:inherit;}
+  .hidden{display:none !important;}
+
+  /* ---------- 상단 바 ---------- */
+  header{
+    display:flex;align-items:center;gap:12px;
+    padding:14px clamp(14px,4vw,28px);
+    border-bottom:1px solid var(--line);background:rgba(11,22,32,.7);backdrop-filter:blur(8px);
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em;font-size:18px;}
+  .logo .dot{width:14px;height:14px;border-radius:50%;background:var(--heal);box-shadow:0 0 14px var(--heal);}
+  .mode-tag{font-size:12px;color:var(--text-dim);padding:4px 10px;border:1px solid var(--line);border-radius:999px;}
+  header .spacer{flex:1;}
+  .ghost-btn{
+    background:transparent;border:1px solid var(--line);color:var(--text-dim);
+    padding:8px 14px;border-radius:12px;font-size:14px;font-weight:600;
+  }
+  .ghost-btn:active{background:var(--surface);}
+
+  /* ---------- 역할 선택 화면 ---------- */
+  #roleScreen{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    padding:clamp(24px,6vw,60px);gap:34px;text-align:center;}
+  #roleScreen h1{font-size:clamp(28px,6vw,46px);margin:0;letter-spacing:-.03em;line-height:1.1;}
+  #roleScreen h1 span{color:var(--heal);}
+  #roleScreen p{margin:0;color:var(--text-dim);max-width:560px;font-size:clamp(15px,2.2vw,18px);line-height:1.6;}
+  .roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;width:min(900px,100%);}
+  .role-card{
+    background:linear-gradient(180deg,var(--surface) 0%,var(--ink-2) 100%);
+    border:1px solid var(--line);border-radius:24px;padding:26px 22px;text-align:left;
+    display:flex;flex-direction:column;gap:10px;transition:transform .15s,border-color .15s;box-shadow:var(--shadow);
+  }
+  .role-card:active{transform:translateY(2px) scale(.99);}
+  .role-card:hover{border-color:var(--heal-soft);}
+  .role-card .ico{font-size:40px;}
+  .role-card .t{font-size:20px;font-weight:800;}
+  .role-card .d{font-size:14px;color:var(--text-dim);line-height:1.5;}
+  .role-card.primary{border-color:var(--heal);}
+  .note{font-size:13px;color:var(--text-dim);max-width:620px;line-height:1.6;border-top:1px dashed var(--line);padding-top:18px;}
+
+  /* ---------- 메인 작업 화면 ---------- */
+  #app{flex:1;display:flex;flex-direction:column;min-height:0;}
+
+  /* 조합된 문장 표시 */
+  .sentence-wrap{padding:clamp(12px,3vw,22px) clamp(14px,4vw,28px) 6px;}
+  .sentence-label{font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+  .sentence{
+    min-height:84px;background:var(--surface);border:1px solid var(--line);border-radius:18px;
+    padding:18px 20px;font-size:clamp(24px,4.5vw,40px);font-weight:700;letter-spacing:-.01em;line-height:1.3;
+    display:flex;align-items:center;flex-wrap:wrap;gap:2px;word-break:keep-all;
+  }
+  .sentence .caret{display:inline-block;width:3px;height:1em;background:var(--heal);margin-left:4px;animation:blink 1s steps(1) infinite;border-radius:2px;}
+  .sentence.empty{color:var(--text-dim);font-weight:500;font-size:clamp(18px,3vw,24px);}
+  @keyframes blink{50%{opacity:0;}}
+
+  /* 흐르는 스캐닝 트랙 */
+  .flow-region{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;min-height:0;padding:8px 0 4px;}
+  .crumb{display:flex;gap:8px;align-items:center;justify-content:center;font-size:14px;color:var(--text-dim);flex-wrap:wrap;padding:0 16px;}
+  .crumb b{color:var(--heal);}
+  .flow-track{
+    display:flex;align-items:center;gap:14px;overflow-x:auto;scroll-behavior:smooth;
+    padding:30px clamp(40px,40vw,400px);scrollbar-width:none;
+  }
+  .flow-track::-webkit-scrollbar{display:none;}
+  .tile{
+    flex:0 0 auto;min-width:120px;padding:22px 24px;border-radius:22px;
+    background:var(--surface);border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    transition:transform .22s cubic-bezier(.2,.8,.2,1),background .22s,box-shadow .22s,opacity .22s;
+    opacity:.5;transform:scale(.86);
+  }
+  .tile .emoji{font-size:34px;line-height:1;}
+  .tile .label{font-size:clamp(20px,3vw,30px);font-weight:800;letter-spacing:-.01em;white-space:nowrap;}
+  .tile.active{
+    opacity:1;transform:scale(1.18);background:linear-gradient(180deg,#0f3b39,#0c2c2b);
+    border-color:var(--heal);box-shadow:0 0 0 3px rgba(94,234,212,.35),0 20px 50px -16px rgba(45,212,191,.55);
+  }
+  .tile.active .label{color:var(--heal);}
+  .tile.special{border-style:dashed;}
+  .tile.cat{border-bottom:4px solid var(--heal-soft);}
+  .tile.cat .label::after{content:' ▸';color:var(--heal-soft);font-weight:900;}
+  .tile .icon{width:46px;height:46px;object-fit:contain;border-radius:10px;background:#fff;padding:3px;display:block;}
+
+  /* 엑셀 메뉴 가져오기 */
+  .xls-list{display:flex;flex-direction:column;gap:10px;max-height:34vh;overflow-y:auto;padding-right:4px;}
+  .xls-row{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 13px;
+    display:flex;align-items:center;gap:11px;}
+  .xls-row .xn{flex:1;min-width:0;}
+  .xls-row .xn b{display:block;font-size:16px;letter-spacing:-.01em;}
+  .xls-row .xn span{font-size:12px;color:var(--text-dim);}
+  .xls-thumbs{display:flex;gap:4px;}
+  .xls-thumbs img{width:28px;height:28px;object-fit:contain;background:#fff;border-radius:7px;padding:2px;}
+  .xls-thumbs .xe{font-size:20px;line-height:28px;}
+  .xls-del{background:transparent;border:1px solid var(--line);color:var(--danger);
+    border-radius:10px;padding:7px 11px;font-size:13px;font-weight:700;flex:0 0 auto;}
+  .xls-del:active{background:var(--surface);}
+
+  /* 잡기 버튼 (시그니처) */
+  .catch-zone{padding:10px clamp(14px,4vw,28px) max(16px,env(safe-area-inset-bottom));}
+  .catch-btn{
+    width:100%;border-radius:26px;padding:clamp(48px,11vh,96px) 26px;font-size:clamp(28px,5.5vw,40px);font-weight:900;letter-spacing:-.01em;
+    min-height:clamp(140px,26vh,260px);
+    background:radial-gradient(120% 140% at 50% 0%,#fde68a 0%,var(--catch) 45%,var(--catch-deep) 100%);
+    color:#3a2606;box-shadow:0 14px 34px -10px rgba(245,158,11,.65),inset 0 -4px 0 rgba(0,0,0,.12);
+    display:flex;align-items:center;justify-content:center;gap:14px;position:relative;overflow:hidden;
+    transition:transform .08s;
+  }
+  .catch-btn:active{transform:translateY(3px) scale(.99);}
+  .catch-btn .ring{
+    position:absolute;inset:0;border-radius:26px;border:3px solid rgba(255,255,255,.55);
+    animation:pulse 1.6s ease-out infinite;pointer-events:none;
+  }
+  @keyframes pulse{0%{transform:scale(.96);opacity:.0;}40%{opacity:.6;}100%{transform:scale(1.04);opacity:0;}}
+  .catch-hint{text-align:center;color:var(--text-dim);font-size:13px;margin-top:10px;}
+
+  /* 컨트롤 바 */
+  .control-bar{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:6px clamp(14px,4vw,28px) 2px;}
+  .chip{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 16px;font-size:14px;font-weight:600;color:var(--text-dim);display:flex;align-items:center;gap:7px;}
+  .chip:active{background:var(--surface-2);}
+  .chip.on{color:var(--ink);background:var(--heal);border-color:var(--heal);}
+  .chip .v{min-width:28px;text-align:center;font-weight:800;color:var(--text);}
+  .chip.on .v{color:var(--ink);}
+
+  /* 속도 직접 설정 */
+  .speed-chip{gap:10px;}
+  .speed-chip input[type=range]{
+    -webkit-appearance:none;appearance:none;width:140px;height:6px;border-radius:999px;
+    background:var(--line);outline:none;
+  }
+  .speed-chip input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--heal);
+    box-shadow:0 0 10px var(--heal);cursor:pointer;
+  }
+  .speed-chip input[type=range]::-moz-range-thumb{
+    width:22px;height:22px;border:none;border-radius:50%;background:var(--heal);box-shadow:0 0 10px var(--heal);cursor:pointer;
+  }
+  .speed-chip input[type=number]{
+    width:64px;background:var(--ink-2);border:1px solid var(--line);border-radius:10px;
+    color:var(--text);font-weight:800;font-size:15px;text-align:center;padding:7px 4px;outline:none;
+  }
+  .speed-chip input[type=number]:focus{border-color:var(--heal);}
+
+  /* 비상 호출 사이렌 버튼 */
+  .sos-btn{
+    width:100%;border-radius:22px;padding:clamp(20px,4vh,32px) 22px;margin-bottom:12px;
+    font-size:clamp(22px,4.5vw,30px);font-weight:900;letter-spacing:.01em;
+    background:radial-gradient(120% 140% at 50% 0%,#fecaca 0%,#ef4444 45%,#b91c1c 100%);
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35);
+    box-shadow:0 14px 34px -10px rgba(239,68,68,.7),inset 0 -4px 0 rgba(0,0,0,.18);
+    display:flex;align-items:center;justify-content:center;gap:12px;position:relative;overflow:hidden;
+    transition:transform .08s;
+  }
+  .sos-btn:active{transform:translateY(3px) scale(.99);}
+  .sos-btn .sos-ring{position:absolute;inset:0;border-radius:22px;border:3px solid rgba(255,255,255,.7);
+    animation:pulse 1.1s ease-out infinite;pointer-events:none;}
+  .sos-btn.active{animation:sosFlash .5s steps(1) infinite;}
+  @keyframes sosFlash{50%{filter:brightness(1.6);box-shadow:0 0 0 6px rgba(239,68,68,.5),0 14px 34px -10px rgba(239,68,68,.9);}}
+
+  /* 문장 아래 액션 버튼 */
+  .sentence-actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;}
+  .act-btn{
+    flex:1;min-width:150px;border-radius:16px;padding:16px 18px;font-size:17px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);
+    background:var(--surface);color:var(--text);transition:transform .08s;
+  }
+  .act-btn:active{transform:translateY(2px);}
+  .act-btn.send{
+    background:linear-gradient(180deg,#0f3b39,#0c2c2b);border-color:var(--heal);color:var(--heal);
+    box-shadow:0 12px 30px -14px rgba(45,212,191,.6);
+  }
+  .act-btn .num{font-size:13px;color:var(--text-dim);font-weight:600;}
+
+  /* 모달 */
+  .modal-bg{position:fixed;inset:0;background:rgba(4,10,16,.72);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;padding:22px;z-index:60;}
+  .modal{width:min(440px,100%);background:var(--ink-2);border:1px solid var(--line);border-radius:24px;
+    padding:26px;box-shadow:var(--shadow);}
+  .modal h3{margin:0 0 6px;font-size:21px;letter-spacing:-.02em;}
+  .modal p{margin:0 0 18px;color:var(--text-dim);font-size:14px;line-height:1.55;}
+  .modal label{display:block;font-size:13px;color:var(--text-dim);margin-bottom:8px;}
+  .modal input{
+    width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:16px 18px;font-size:22px;color:var(--text);font-weight:700;letter-spacing:.02em;outline:none;
+  }
+  .modal input:focus{border-color:var(--heal);}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;}
+  .modal-actions button{flex:1;border-radius:14px;padding:15px;font-size:16px;font-weight:800;}
+  .btn-primary{background:var(--heal);color:var(--ink);}
+  .btn-quiet{background:var(--surface);border:1px solid var(--line);color:var(--text-dim);}
+
+  /* 전송 기록 */
+  .hist-modal{width:min(520px,100%);}
+  .hist-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .hist-clear{background:transparent;border:1px solid var(--line);color:var(--danger);
+    border-radius:10px;padding:7px 12px;font-size:13px;font-weight:700;}
+  .hist-clear:active{background:var(--surface);}
+  .hist-list{display:flex;flex-direction:column;gap:10px;max-height:48vh;overflow-y:auto;padding-right:4px;}
+  .hist-empty{color:var(--text-dim);text-align:center;padding:30px 0;font-size:15px;}
+  .hist-row{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;}
+  .hist-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:6px;}
+  .hist-via{font-size:14px;}
+  .hist-text{font-size:17px;font-weight:700;line-height:1.4;word-break:keep-all;}
+  .hist-acts{display:flex;gap:8px;margin-top:10px;}
+  .hist-mini{flex:1;background:var(--ink-2);border:1px solid var(--line);color:var(--text-dim);
+    border-radius:10px;padding:9px;font-size:13px;font-weight:700;}
+  .hist-mini:active{background:var(--surface-2);color:var(--text);}
+
+  /* 폰 모드: 미러 표시 */
+  .mirror-now{text-align:center;padding:8px;}
+  .mirror-now .lbl{font-size:13px;color:var(--text-dim);}
+  .mirror-now .big{font-size:clamp(44px,16vw,120px);font-weight:900;color:var(--heal);line-height:1.1;margin-top:6px;min-height:1.2em;}
+  .conn-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--danger);margin-right:6px;vertical-align:middle;}
+  .conn-dot.ok{background:var(--heal);box-shadow:0 0 10px var(--heal);}
+
+  /* 토스트 */
+  #toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--surface-2);border:1px solid var(--line);padding:12px 20px;border-radius:14px;font-weight:700;
+    opacity:0;pointer-events:none;transition:.25s;z-index:50;box-shadow:var(--shadow);}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ---------- 연결(근접 페어링) 패널 ---------- */
+  .conn-modal{width:min(540px,100%);max-height:88vh;overflow-y:auto;}
+  .conn-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 18px;}
+  .conn-tab{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    font-size:13px;font-weight:700;color:var(--text-dim);transition:border-color .15s,background .15s;
+  }
+  .conn-tab .ti{font-size:24px;line-height:1;}
+  .conn-tab:active{background:var(--surface-2);}
+  .conn-tab.on{border-color:var(--heal);color:var(--text);background:linear-gradient(180deg,#0f3b39,#0c2c2b);}
+  .conn-pane{display:none;flex-direction:column;gap:14px;}
+  .conn-pane.on{display:flex;}
+  .conn-info{font-size:13px;color:var(--text-dim);line-height:1.6;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;padding:13px 15px;}
+  .conn-info b{color:var(--heal);font-weight:800;}
+  .conn-warn{border-color:var(--catch);}
+  .conn-warn b{color:var(--catch);}
+  .seg{display:flex;gap:8px;}
+  .seg button{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--text-dim);
+    border-radius:12px;padding:11px;font-size:14px;font-weight:700;}
+  .seg button.on{background:var(--heal);color:var(--ink);border-color:var(--heal);}
+  .step{display:none;flex-direction:column;gap:12px;}
+  .step.on{display:flex;}
+  .step-h{font-size:13px;color:var(--text-dim);font-weight:700;letter-spacing:.02em;}
+  .step-h .n{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+    border-radius:50%;background:var(--heal);color:var(--ink);font-size:12px;font-weight:900;margin-right:7px;}
+  .code-box{width:100%;min-height:74px;background:var(--ink-2);border:1px solid var(--line);
+    border-radius:12px;color:var(--text);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    padding:12px 14px;resize:vertical;outline:none;word-break:break-all;line-height:1.5;}
+  .code-box:focus{border-color:var(--heal);}
+  .code-box::placeholder{color:var(--text-dim);}
+  .qr-wrap{display:flex;justify-content:center;}
+  .qr-card{background:#fff;border-radius:14px;padding:14px;display:none;}
+  .qr-card.on{display:block;}
+  .qr-card img,.qr-card canvas{display:block;width:200px;height:200px;}
+  .conn-btns{display:flex;gap:9px;flex-wrap:wrap;}
+  .conn-btns .b{flex:1;min-width:120px;border-radius:13px;padding:13px;font-size:15px;font-weight:800;
+    border:1px solid var(--line);background:var(--surface);color:var(--text);
+    display:flex;align-items:center;justify-content:center;gap:7px;}
+  .conn-btns .b:active{transform:translateY(2px);}
+  .conn-btns .b.go{background:var(--heal);color:var(--ink);border-color:var(--heal);}
+  .conn-btns .b.busy{opacity:.6;pointer-events:none;}
+  .scan-cam{display:none;width:100%;border-radius:14px;border:1px solid var(--line);background:#000;}
+  .scan-cam.on{display:block;}
+  .conn-status-line{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;
+    padding:11px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);}
+  .conn-status-line .conn-dot{margin:0;}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important;scroll-behavior:auto !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= 역할 선택 ================= -->
+<section id="roleScreen">
+  <div>
+    <h1>케어<span>톡</span></h1>
+    <p style="margin-top:14px">몸을 움직이기 어려운 병상 환자가 <b style="color:var(--text)">한 번의 ‘잡기’</b>로
+    말을 만들 수 있도록 돕는 의사소통 앱입니다.
+    어휘는 서울시장애인의사소통권리증진센터 <b style="color:var(--text)">「입원 환자용 AAC 도구」</b>의
+    다섯 가지 의도 — <b style="color:var(--heal)">필요해요 · 궁금해요 · 도와주세요 · 불편해요 · 통증이 있어요</b> — 를 반영했습니다.
+    사용할 방식을 골라 주세요.</p>
+  </div>
+
+  <div class="roles">
+    <button class="role-card primary" data-role="solo">
+      <div class="ico">🩺</div>
+      <div class="t">통합 모드 (한 기기)</div>
+      <div class="d">태블릿 한 대만으로 사용. 화면에 글자가 흐르고, 화면을 한 번 누르면 ‘잡기’가 됩니다. 가장 간단하고 안정적입니다.</div>
+    </button>
+    <button class="role-card" data-role="tablet">
+      <div class="ico">📺</div>
+      <div class="t">태블릿 (디스플레이)</div>
+      <div class="d">환자 앞 큰 화면. 글자·아이콘을 흘려보내고, 폰에서 온 ‘잡기’ 신호로 글자를 선택해 문장을 만듭니다.</div>
+    </button>
+    <button class="role-card" data-role="phone">
+      <div class="ico">📱</div>
+      <div class="t">폰 (잡기)</div>
+      <div class="d">환자 손에 쥐는 작은 기기. 큰 버튼을 눌러 태블릿 화면의 글자를 ‘잡습니다’. 진동으로 알려줍니다.</div>
+    </button>
+  </div>
+
+  <p class="note">※ 태블릿·폰 모드는 화면 진입 후 상단 <b style="color:var(--text)">🔗 연결</b>에서 연결 방식을 고릅니다.
+  같은 브라우저의 두 탭은 <b style="color:var(--text)">같은 기기</b>로 바로 연결되고,
+  서로 다른 두 기기는 같은 WiFi에서 <b style="color:var(--text)">WiFi 직접 연결</b>(서버 없이 코드/QR 교환)로 묶을 수 있습니다.
+  <b style="color:var(--text)">블루투스</b>는 케어톡 BLE 서비스를 가진 기기에 연결되며, 폰↔폰 직결은 안드로이드 앱(Capacitor BLE)으로 감싸면 됩니다.
+  <b style="color:var(--text)">시리얼(USB)</b>은 PC 크롬에서 아두이노 등 USB 시리얼 장치(115200bps)를 ‘잡기’ 버튼으로 연결합니다.</p>
+</section>
+
+<!-- ================= 메인 ================= -->
+<div id="app" class="hidden">
+  <header>
+    <div class="logo"><span class="dot"></span> 케어톡</div>
+    <span class="mode-tag" id="modeTag">통합</span>
+    <span class="spacer"></span>
+    <span id="connState" class="hidden" style="font-size:13px;color:var(--text-dim)"><span class="conn-dot" id="connDot"></span><span id="connKind"></span><span id="connText">연결 대기</span></span>
+    <button class="ghost-btn" id="connBtn">🔗 연결</button>
+    <button class="ghost-btn" id="excelBtn">📁 엑셀 메뉴</button>
+    <button class="ghost-btn" id="histBtn">🕘 기록</button>
+    <button class="ghost-btn" id="phoneSettings">📞 번호 등록</button>
+    <button class="ghost-btn" id="backHome">처음으로</button>
+  </header>
+
+  <!-- 조합 문장 (통합/태블릿/폰 공통 표시) -->
+  <div class="sentence-wrap" id="sentenceWrap">
+    <div class="sentence-label">전하고 싶은 말</div>
+    <div class="sentence empty" id="sentence">아직 만든 말이 없어요</div>
+    <div class="sentence-actions">
+      <button class="act-btn send" id="smsBtn">📨 문자로 보내기 <span class="num" id="smsNum"></span></button>
+    </div>
+  </div>
+
+  <!-- 폰 전용: 현재 흐르는 글자 미러 -->
+  <div class="mirror-now hidden" id="mirror">
+    <div class="lbl">지금 태블릿 화면의 글자</div>
+    <div class="big" id="mirrorBig">—</div>
+  </div>
+
+  <!-- 흐르는 트랙 (통합/태블릿) -->
+  <div class="flow-region" id="flowRegion">
+    <div class="crumb" id="crumb"></div>
+    <div class="flow-track" id="track"></div>
+  </div>
+
+  <!-- 컨트롤 (통합/태블릿) -->
+  <div class="control-bar" id="controls">
+    <button class="chip" id="speedDown">🐢 느리게</button>
+    <span class="chip speed-chip">
+      <span>속도</span>
+      <input type="range" id="speedRange" min="400" max="4000" step="50" value="1400">
+      <input type="number" id="speedInput" min="0.4" max="4" step="0.1" value="1.4">
+      <span>초</span>
+    </span>
+    <button class="chip" id="speedUp">🐇 빠르게</button>
+    <button class="chip" id="ttsToggle">🔊 읽어주기 <span class="v" id="ttsState">켬</span></button>
+    <button class="chip" id="scanReadToggle">👁️ 스크롤 읽기 <span class="v" id="scanReadState">끔</span></button>
+  </div>
+
+  <!-- 잡기 영역 (통합/폰) -->
+  <div class="catch-zone" id="catchZone">
+    <button class="sos-btn" id="sosBtn"><span class="sos-ring"></span>🚨 비상 호출</button>
+    <button class="catch-btn" id="catchBtn"><span class="ring"></span>👆 잡기</button>
+    <div class="catch-hint" id="catchHint">원하는 글자가 가운데로 오면 누르세요</div>
+  </div>
+</div>
+
+<!-- 엑셀 메뉴 가져오기 모달 -->
+<div class="modal-bg hidden" id="excelModal">
+  <div class="modal hist-modal">
+    <div class="hist-head">
+      <h3 style="margin:0">엑셀로 메뉴 추가</h3>
+      <button class="hist-clear" id="excelClose" style="color:var(--text-dim)">닫기</button>
+    </div>
+    <p style="margin:6px 0 12px">엑셀 파일의 <b style="color:var(--text)">텍스트 항목과 삽입된 아이콘 그림</b>을 읽어
+    스캔 메뉴로 추가합니다. 추가된 메뉴는 첫 화면 목록 끝에 나타나고, 이 기기에 저장됩니다.</p>
+
+    <div class="conn-info" style="margin-bottom:12px">
+      <b>엑셀 작성 방법</b> — 1행은 제목 줄로 두고 아래 열 이름을 사용하세요.<br>
+      · <b>카테고리</b> : 묶음 이름(비우면 시트 이름 사용)<br>
+      · <b>텍스트</b> : 버튼에 보일 짧은 말 <span style="opacity:.7">(필수)</span><br>
+      · <b>문장</b> : 실제로 말할 완성 문장(비우면 텍스트 그대로)<br>
+      · <b>이모지</b> : 아이콘 대신 쓸 이모지(선택)<br>
+      · <b>아이콘 그림</b> : 해당 <b>행 위에 삽입</b>(삽입 ▸ 그림 ▸ 셀 위)하면 자동으로 그 항목의 아이콘이 됩니다.
+    </div>
+
+    <div class="conn-btns" style="margin-bottom:14px">
+      <button class="b" id="excelTemplate">📄 양식 내려받기</button>
+      <button class="b go" id="excelPick">📁 엑셀 파일 불러오기</button>
+      <input type="file" id="excelFile" accept=".xlsx,.xlsm" style="display:none">
+    </div>
+    <div class="conn-info conn-warn hidden" id="excelMsg"></div>
+
+    <div class="hist-head" style="margin-top:6px">
+      <b style="font-size:14px">불러온 메뉴</b>
+      <button class="hist-clear" id="excelClearAll">전체 삭제</button>
+    </div>
+    <div class="xls-list" id="excelList" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- 전송 기록 모달 -->
+<div class="modal-bg hidden" id="histModal">
+  <div class="modal hist-modal">
+    <div class="hist-head">
+      <h3 style="margin:0">전하고 싶은 말 기록</h3>
+      <button class="hist-clear" id="histClear">전체 삭제</button>
+    </div>
+    <p style="margin:6px 0 14px">최근 보낸·읽은 말 10건이 시간과 함께 저장됩니다.</p>
+    <div class="hist-list" id="histList"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="histClose" style="flex:1">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 전화번호 등록 모달 -->
+<div class="modal-bg hidden" id="phoneModal">
+  <div class="modal">
+    <h3>받는 사람 전화번호</h3>
+    <p>환자가 ‘문자 보내기’를 고르면, 만든 말이 이 번호로 전송됩니다(문자 앱이 열리면 보내기만 누르면 돼요).</p>
+    <label for="phoneInput">보호자 휴대폰 번호</label>
+    <input id="phoneInput" type="tel" inputmode="tel" placeholder="010-1234-5678" autocomplete="tel">
+    <div class="modal-actions">
+      <button class="btn-quiet" id="phoneCancel">취소</button>
+      <button class="btn-primary" id="phoneSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 연결(근접 페어링) 모달 -->
+<div class="modal-bg hidden" id="connModal">
+  <div class="modal conn-modal">
+    <div class="hist-head">
+      <h3 style="margin:0">기기 연결</h3>
+      <button class="hist-clear" id="connModalClose" style="color:var(--text-dim)">닫기</button>
+    </div>
+    <p style="margin:6px 0 8px">두 기기를 가까이에서 연결하는 방식을 고르세요. 태블릿·폰이 같은 신호로 묶입니다.</p>
+
+    <div class="conn-status-line"><span class="conn-dot" id="connModalDot"></span><span id="connModalText">아직 연결되지 않았어요</span></div>
+
+    <div class="conn-tabs" style="margin-top:14px">
+      <button class="conn-tab on" data-method="channel"><span class="ti">🖥️</span>같은 기기</button>
+      <button class="conn-tab" data-method="wifi"><span class="ti">📶</span>WiFi</button>
+      <button class="conn-tab" data-method="bluetooth"><span class="ti">🔵</span>블루투스</button>
+      <button class="conn-tab" data-method="serial"><span class="ti">🔌</span>시리얼</button>
+    </div>
+
+    <!-- 같은 기기 -->
+    <div class="conn-pane on" data-pane="channel">
+      <div class="conn-info">같은 브라우저의 <b>두 탭/창</b>에서 즉시 연결됩니다. 한 기기로 시험하거나, 같은 기기에서 태블릿·폰 모드를 함께 띄울 때 쓰세요.</div>
+      <div class="conn-btns"><button class="b go" id="chUse">이 방식으로 연결</button></div>
+    </div>
+
+    <!-- WiFi -->
+    <div class="conn-pane" data-pane="wifi">
+      <div class="conn-info">같은 <b>WiFi·핫스팟</b>에 있는 서로 다른 두 기기를 인터넷 서버 없이 직접 연결합니다. 한 기기는 <b>초대</b>, 다른 기기는 <b>참여</b>를 골라 코드를 한 번씩 주고받으면 됩니다.</div>
+      <div class="seg">
+        <button class="on" id="wifiHostTab">초대 만들기</button>
+        <button id="wifiGuestTab">참여하기</button>
+      </div>
+
+      <!-- 호스트(초대) -->
+      <div class="step on" data-step="host">
+        <div class="step-h"><span class="n">1</span>초대 코드를 만들어 상대 기기에 보여주세요</div>
+        <div class="conn-btns"><button class="b go" id="wifiMakeInvite">초대 코드 만들기</button></div>
+        <div class="qr-wrap"><div class="qr-card" id="wifiInviteQR"></div></div>
+        <textarea class="code-box" id="wifiInviteCode" placeholder="여기에 초대 코드가 표시됩니다" readonly></textarea>
+        <div class="conn-btns"><button class="b" id="wifiInviteCopy">📋 코드 복사</button></div>
+        <div class="step-h"><span class="n">2</span>상대가 만든 <b>응답 코드</b>를 받아 붙여넣고 연결을 끝내세요</div>
+        <textarea class="code-box" id="wifiAnswerIn" placeholder="상대의 응답 코드를 붙여넣기"></textarea>
+        <div class="conn-btns">
+          <button class="b" id="wifiAnswerScan">📷 QR 스캔</button>
+          <button class="b go" id="wifiFinish">연결 완료</button>
+        </div>
+      </div>
+
+      <!-- 게스트(참여) -->
+      <div class="step" data-step="guest">
+        <div class="step-h"><span class="n">1</span>상대의 <b>초대 코드</b>를 붙여넣으세요</div>
+        <textarea class="code-box" id="wifiInviteIn" placeholder="상대의 초대 코드를 붙여넣기"></textarea>
+        <div class="conn-btns">
+          <button class="b" id="wifiInviteScan">📷 QR 스캔</button>
+          <button class="b go" id="wifiMakeAnswer">응답 코드 만들기</button>
+        </div>
+        <div class="step-h"><span class="n">2</span>만들어진 <b>응답 코드</b>를 상대 기기에 보여주세요</div>
+        <div class="qr-wrap"><div class="qr-card" id="wifiAnswerQR"></div></div>
+        <textarea class="code-box" id="wifiAnswerCode" placeholder="여기에 응답 코드가 표시됩니다" readonly></textarea>
+        <div class="conn-btns"><button class="b" id="wifiAnswerCopy">📋 코드 복사</button></div>
+      </div>
+
+      <video class="scan-cam" id="scanCam" playsinline muted></video>
+    </div>
+
+    <!-- 블루투스 -->
+    <div class="conn-pane" data-pane="bluetooth">
+      <div class="conn-info conn-warn">블루투스(BLE)는 <b>케어톡 BLE 서비스</b>(예: UNO R4 잡기 컨트롤러 <b>CareTalk-R4</b>)를 제공하는 기기에 연결합니다. 브라우저는 BLE에서 <b>중앙(연결하는 쪽)</b>만 될 수 있어, 폰↔폰 직접 페어링은 케어톡을 안드로이드 앱(Capacitor BLE 주변기기)으로 감싸야 가능합니다. 폰·태블릿 두 대만 있다면 <b>WiFi</b>를 권합니다.</div>
+      <div class="conn-btns"><button class="b go" id="btScan">🔵 블루투스 기기 검색·연결</button></div>
+      <div class="conn-info" id="btMsg" style="display:none"></div>
+    </div>
+
+    <!-- 시리얼 (Web Serial) -->
+    <div class="conn-pane" data-pane="serial">
+      <div class="conn-info">USB로 연결된 <b>아두이노 등 시리얼 장치(115200bps)</b>를 ‘잡기’ 컨트롤러로 사용합니다.
+      장치는 줄바꿈으로 구분된 JSON — <b>{"k":"catch"}</b>(잡기), <b>{"k":"sos","on":true}</b>(비상), <b>{"k":"hello"}</b>(연결 유지) — 를 보내면 됩니다.</div>
+      <div class="conn-info conn-warn">Web Serial은 <b>PC 크롬/엣지</b>에서만 지원됩니다(안드로이드 크롬 미지원 — 안드로이드는 WiFi/블루투스를 이용하세요).
+      또한 파일은 <b>https 또는 localhost</b>에서 열어야 포트 선택 창이 뜹니다(file:// 열기도 대부분 동작).</div>
+      <div class="conn-btns"><button class="b go" id="serialConnect">🔌 시리얼 포트 선택·연결</button></div>
+      <div class="conn-btns"><button class="b" id="serialDisconnect" style="display:none">연결 해제</button></div>
+      <div class="conn-info" id="serialMsg" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   케어톡 — 병상 환자/보호자 의사소통 (스캐닝 방식 AAC)
+   한 파일에 통합(solo) / 태블릿(tablet) / 폰(phone) 모드
+   기기 간 신호는 BroadcastChannel 로 주고받음
+   → 실제 블루투스로 바꾸려면 link.send / link.onMessage 두 곳만 교체
+   ============================================================ */
+
+/* ---------- 0. 통신 계층 : 같은기기 / WiFi / 블루투스 다중 전송 ----------
+   link 파사드는 기존 API(open / send / onMessage)를 그대로 유지하면서
+   내부 전송 방식(transport)을 교체할 수 있게 합니다.
+     · channel   : BroadcastChannel  — 같은 브라우저의 두 탭/창
+     · wifi      : WebRTC DataChannel — 같은 WiFi/핫스팟의 두 기기(서버 불필요)
+     · serial    : Web Serial(USB)   — 아두이노 등 시리얼 장치, 115200bps 줄바꿈 JSON
+     · bluetooth : Web Bluetooth GATT — 케어톡 BLE 서비스를 가진 기기에 연결
+   ------------------------------------------------------------------------ */
+
+/* ============================================================
+   케어톡 BLE Serial 프로토콜 v1  (UnoR4BLESerial.ino 와 동일하게 유지)
+   ------------------------------------------------------------
+   · 서비스   : 6e400001-b5a3-f393-e0a9-e50e24dcca9e (Nordic UART)
+   · TX 특성  : 6e400002-…  Write / WriteWithoutResponse
+                → 앱(중앙) → 아두이노(주변기기)
+   · RX 특성  : 6e400003-…  Notify
+                → 아두이노(주변기기) → 앱(중앙)
+   · 프레이밍 : UTF-8 JSON 한 줄 + '\n' 종료, 20바이트 청크 분할
+                (기본 ATT MTU 23바이트에서도 안전)
+   · 메시지   : 앱→기기  {"k":"hello"} {"k":"sentence","text":"…"}
+                          {"k":"now","label":"…"} {"k":"sos","on":true|false}
+                기기→앱  {"k":"hello"} {"k":"catch"} {"k":"sos","on":true|false}
+   · USB 시리얼(Web Serial, 115200bps)도 동일한 줄바꿈 JSON 프레임 사용
+   ※ Web Bluetooth 는 UUID를 반드시 소문자로 표기해야 함
+   ============================================================ */
+const BLE = {
+  SERVICE:'6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+  TX:'6e400002-b5a3-f393-e0a9-e50e24dcca9e',   // 중앙(브라우저) → 주변기기  write
+  RX:'6e400003-b5a3-f393-e0a9-e50e24dcca9e'    // 주변기기 → 중앙(브라우저)  notify
+};
+
+/* base64url ↔ 바이트 (WiFi 시그널링 코드용) */
+function b64urlFromBytes(bytes){
+  let s=''; bytes.forEach(b=>s+=String.fromCharCode(b));
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function bytesFromB64url(str){
+  str=str.replace(/-/g,'+').replace(/_/g,'/'); while(str.length%4) str+='=';
+  const bin=atob(str), out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+/* SDP를 gzip 압축해 짧은 코드로 (QR/복사 교환). 미지원 브라우저는 평문 base64 */
+async function packSignal(desc){
+  const json=JSON.stringify({t:desc.type,s:desc.sdp});
+  if('CompressionStream' in window){
+    const cs=new CompressionStream('gzip');
+    const ab=await new Response(new Blob([json]).stream().pipeThrough(cs)).arrayBuffer();
+    return 'G'+b64urlFromBytes(new Uint8Array(ab));
+  }
+  return 'J'+b64urlFromBytes(new TextEncoder().encode(json));
+}
+async function unpackSignal(code){
+  code=code.trim(); const tag=code[0], body=code.slice(1);
+  let json;
+  if(tag==='G' && 'DecompressionStream' in window){
+    const ds=new DecompressionStream('gzip');
+    const ab=await new Response(new Blob([bytesFromB64url(body)]).stream().pipeThrough(ds)).arrayBuffer();
+    json=new TextDecoder().decode(ab);
+  } else {
+    json=new TextDecoder().decode(bytesFromB64url(body));
+  }
+  const o=JSON.parse(json); return {type:o.t, sdp:o.s};
+}
+
+const link = (() => {
+  let active=null, handler=()=>{}, statusCb=()=>{};
+  const deliver = data => { try{ handler(data); }catch(_){} };
+
+  /* --- 같은 기기 : BroadcastChannel --- */
+  function channelTransport(){
+    let bc=null;
+    return {
+      kind:'channel', label:'같은 기기',
+      async start(){ bc=new BroadcastChannel('care-talk'); bc.onmessage=e=>deliver(e.data); statusCb('ready','같은 기기'); },
+      send(msg){ if(bc) bc.postMessage(msg); },
+      stop(){ try{ bc&&bc.close(); }catch(_){} bc=null; }
+    };
+  }
+
+  /* --- WiFi : WebRTC DataChannel (수동/QR 시그널링, 서버 불필요) --- */
+  function wifiTransport(){
+    let pc=null, dc=null;
+    function bindChannel(ch){
+      dc=ch;
+      dc.onopen   =()=>statusCb('connected','WiFi');
+      dc.onclose  =()=>statusCb('closed','WiFi');
+      dc.onmessage=e=>{ try{ deliver(JSON.parse(e.data)); }catch(_){} };
+    }
+    function makePC(){
+      pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+      pc.onconnectionstatechange=()=>{
+        const s=pc.connectionState;
+        if(s==='connected') statusCb('connected','WiFi');
+        else if(s==='failed'||s==='disconnected'||s==='closed') statusCb('closed','WiFi');
+      };
+    }
+    /* 모든 ICE 후보가 모일 때까지 대기(non-trickle): 코드 1개로 교환 */
+    function iceComplete(){
+      return new Promise(res=>{
+        if(pc.iceGatheringState==='complete') return res();
+        const t=setTimeout(res,2800);
+        pc.addEventListener('icegatheringstatechange',()=>{
+          if(pc.iceGatheringState==='complete'){ clearTimeout(t); res(); }
+        });
+      });
+    }
+    return {
+      kind:'wifi', label:'WiFi',
+      async start(){ statusCb('ready','WiFi'); },
+      send(msg){ if(dc&&dc.readyState==='open') dc.send(JSON.stringify(msg)); },
+      stop(){ try{dc&&dc.close();}catch(_){} try{pc&&pc.close();}catch(_){} dc=pc=null; },
+      /* 초대(호스트) : 초대코드 생성 */
+      async createInvite(){
+        makePC(); bindChannel(pc.createDataChannel('care'));
+        await pc.setLocalDescription(await pc.createOffer());
+        await iceComplete();
+        return packSignal(pc.localDescription);
+      },
+      /* 호스트가 상대 응답코드 적용 → 연결 완료 */
+      async applyAnswer(code){ await pc.setRemoteDescription(await unpackSignal(code)); },
+      /* 참여(게스트) : 초대코드로 응답코드 생성 */
+      async joinWith(code){
+        makePC(); pc.ondatachannel=e=>bindChannel(e.channel);
+        await pc.setRemoteDescription(await unpackSignal(code));
+        await pc.setLocalDescription(await pc.createAnswer());
+        await iceComplete();
+        return packSignal(pc.localDescription);
+      }
+    };
+  }
+
+  /* --- 블루투스 : Web Bluetooth GATT 중앙(central) --- */
+  function bluetoothTransport(){
+    let device=null, server=null, tx=null, rx=null, rxBuf='';
+    const enc=new TextEncoder(), dec=new TextDecoder();
+    function onNotify(ev){
+      /* 20바이트 청크 경계에서 UTF-8(한글)이 잘려도 안전하게 stream 디코딩 */
+      rxBuf+=dec.decode(ev.target.value,{stream:true}); let i;
+      while((i=rxBuf.indexOf('\n'))>=0){
+        const line=rxBuf.slice(0,i); rxBuf=rxBuf.slice(i+1);
+        if(line) try{ deliver(JSON.parse(line)); }catch(_){}
+      }
+    }
+    /* 프로토콜 v1: 'JSON+\n' 을 20바이트 청크로 분할 전송.
+       기본 ATT MTU(23B)에서도 잘리지 않도록 20B 고정,
+       패킷 유실 방지를 위해 응답 있는 쓰기(writeValue)를 우선 사용 */
+    let sendQ=Promise.resolve();          // 메시지 간 청크가 섞이지 않도록 직렬화
+    async function writeChunks(str){
+      const bytes=enc.encode(str+'\n'), SIZE=20;
+      for(let o=0;o<bytes.length;o+=SIZE){
+        const part=bytes.slice(o,o+SIZE);
+        if(tx.writeValue) await tx.writeValue(part);
+        else await tx.writeValueWithoutResponse(part);
+      }
+    }
+    return {
+      kind:'bluetooth', label:'블루투스',
+      async start(){
+        if(!navigator.bluetooth) throw new Error('이 브라우저는 Web Bluetooth를 지원하지 않습니다');
+        device=await navigator.bluetooth.requestDevice({
+          filters:[{services:[BLE.SERVICE]}], optionalServices:[BLE.SERVICE]
+        });
+        device.addEventListener('gattserverdisconnected',()=>statusCb('closed','블루투스'));
+        statusCb('connecting','블루투스');
+        server=await device.gatt.connect();
+        const svc=await server.getPrimaryService(BLE.SERVICE);
+        tx=await svc.getCharacteristic(BLE.TX);
+        rx=await svc.getCharacteristic(BLE.RX);
+        await rx.startNotifications();
+        rx.addEventListener('characteristicvaluechanged',onNotify);
+        statusCb('connected','블루투스');
+      },
+      send(msg){
+        if(!tx) return;
+        const s=JSON.stringify(msg);
+        sendQ=sendQ.then(()=>writeChunks(s)).catch(()=>{});
+      },
+      stop(){ try{ if(device&&device.gatt.connected) device.gatt.disconnect(); }catch(_){} device=server=tx=rx=null; rxBuf=''; }
+    };
+  }
+
+  /* --- 시리얼 : Web Serial (아두이노 등 USB 시리얼 '잡기' 컨트롤러, 115200bps) --- */
+  const SERIAL_BAUD = 115200;
+  function serialTransport(){
+    let port=null, reader=null, writer=null, alive=false, rxBuf='';
+    const enc=new TextEncoder(), dec=new TextDecoder();
+
+    async function readLoop(){
+      while(alive && port && port.readable){
+        reader=port.readable.getReader();
+        try{
+          for(;;){
+            const {value,done}=await reader.read();
+            if(done) break;
+            rxBuf+=dec.decode(value,{stream:true});
+            let i;
+            while((i=rxBuf.indexOf('\n'))>=0){          // 줄바꿈 구분 JSON
+              const line=rxBuf.slice(0,i).trim(); rxBuf=rxBuf.slice(i+1);
+              if(line&&line[0]==='{') try{ deliver(JSON.parse(line)); }catch(_){}
+            }
+          }
+        }catch(_){ /* 케이블 분리 등 → 루프 종료 */ }
+        finally{ try{ reader.releaseLock(); }catch(_){} reader=null; }
+        break;
+      }
+      if(alive){ alive=false; statusCb('closed','시리얼'); }
+    }
+
+    function onDisconnect(e){ if(e.target===port){ alive=false; statusCb('closed','시리얼'); } }
+
+    return {
+      kind:'serial', label:'시리얼',
+      async start(){
+        if(!('serial' in navigator))
+          throw new Error('이 브라우저는 Web Serial을 지원하지 않습니다 — PC 크롬/엣지를 사용하세요');
+        statusCb('connecting','시리얼');
+        port=await navigator.serial.requestPort();       // 사용자가 포트 선택
+        await port.open({baudRate:SERIAL_BAUD});
+        writer=port.writable?port.writable.getWriter():null;
+        alive=true; rxBuf='';
+        navigator.serial.addEventListener('disconnect',onDisconnect);
+        statusCb('connected','시리얼');
+        readLoop();                                      // 수신 시작(비동기)
+      },
+      send(msg){                                         // 앱 → 장치 (문장 미러 등)
+        if(writer&&alive)
+          writer.write(enc.encode(JSON.stringify(msg)+'\n')).catch(()=>{});
+      },
+      stop(){
+        alive=false;
+        navigator.serial&&navigator.serial.removeEventListener('disconnect',onDisconnect);
+        const p=port; port=null;
+        (async()=>{
+          try{ reader&&await reader.cancel(); }catch(_){}
+          try{ writer&&writer.releaseLock(); }catch(_){}
+          try{ p&&await p.close(); }catch(_){}
+        })();
+        reader=writer=null;
+      }
+    };
+  }
+
+  const factory={ channel:channelTransport, wifi:wifiTransport, bluetooth:bluetoothTransport, serial:serialTransport };
+  return {
+    /* 기존 호출부 호환: 처음 열릴 때 같은 기기(채널)로 시작 */
+    open(){ if(!active) this.use('channel'); },
+    async use(kind){
+      if(active&&active.stop) active.stop();
+      active=factory[kind]();
+      await active.start();
+      return active;
+    },
+    get tx(){ return active; },                       // 연결 패널이 쓰는 현재 전송
+    kind(){ return active?active.kind:'none'; },
+    send(msg){ if(active) active.send(msg); },         // ← 모든 전송 공통 진입점
+    onMessage(fn){ handler=fn; },
+    onStatus(fn){ statusCb=fn; }
+  };
+})();
+
+/* ---------- 1. 한글 자모 조합기 ---------- */
+const CHO  = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const JUNG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+const JONG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+const hangul = {
+  committed:'', cur:{cho:-1,jung:-1,jong:-1},
+  isVowel(j){ return JUNG.includes(j); },
+  curChar(){
+    const c=this.cur;
+    if(c.cho<0) return '';
+    if(c.jung<0) return CHO[c.cho];
+    const code=0xAC00+(c.cho*21+c.jung)*28+(c.jong<0?0:c.jong);
+    return String.fromCharCode(code);
+  },
+  text(){ return this.committed + this.curChar(); },
+  commit(){ this.committed += this.curChar(); this.cur={cho:-1,jung:-1,jong:-1}; },
+  add(jamo){
+    const c=this.cur;
+    if(this.isVowel(jamo)){
+      const vi=JUNG.indexOf(jamo);
+      if(c.cho<0){ this.committed+=jamo; }                 // 홀로 선 모음
+      else if(c.jung<0){ c.jung=vi; }                      // 초성+중성
+      else if(c.jong<0){ this.commit(); this.committed+=jamo; } // 완성 음절 뒤 모음 → 따로
+      else{                                                // 받침을 다음 글자 초성으로 이동
+        const moved=JONG[c.jong]; const ci=CHO.indexOf(moved);
+        c.jong=-1; this.commit();
+        if(ci>=0){ this.cur={cho:ci,jung:vi,jong:-1}; }
+        else this.committed+=jamo;
+      }
+    } else { // 자음
+      const ci=CHO.indexOf(jamo);
+      if(c.cho<0){ c.cho=ci; }
+      else if(c.jung<0){ this.commit(); this.cur.cho=ci; } // 자음 연속 → 앞 자음 확정
+      else if(c.jong<0){
+        const ji=JONG.indexOf(jamo);
+        if(ji>0) c.jong=ji; else { this.commit(); this.cur.cho=ci; }
+      } else { this.commit(); this.cur.cho=ci; }
+    }
+  },
+  back(){
+    const c=this.cur;
+    if(c.jong>=0) c.jong=-1;
+    else if(c.jung>=0) c.jung=-1;
+    else if(c.cho>=0) c.cho=-1;
+    else this.committed=this.committed.slice(0,-1);
+  },
+  reset(){ this.committed=''; this.cur={cho:-1,jung:-1,jong:-1}; }
+};
+
+/* ============================================================
+   2. 어휘 데이터 — 서울시장애인의사소통권리증진센터
+      「입원 환자용 AAC 도구 스티커」의 5대 의도 구조를 반영
+      ① 필요해요 ② 궁금해요 ③ 도와주세요 ④ 불편해요 ⑤ 통증이 있어요
+   항목 형식: [이모지, 짧은 라벨, 완성 문장(생략 시 라벨 그대로)]
+   ============================================================ */
+
+/* 한국어 조사 자동 선택 (받침 유무) */
+function hasJong(w){ const c=w.charCodeAt(w.length-1); return c>=0xAC00&&c<=0xD7A3 ? ((c-0xAC00)%28)!==0 : false; }
+function iga(w){ return hasJong(w)?'이':'가'; }        // 이/가
+function eulreul(w){ return hasJong(w)?'을':'를'; }    // 을/를
+
+/* --- 자주 쓰는 말 (최우선 스캔) --- */
+const QUICK = [
+  ['👍','네','네'],['🙅','아니요','아니요'],['😣','아파요','아파요'],['💧','물 주세요','물 주세요'],
+  ['🚽','화장실','화장실 가고 싶어요'],['🍚','배고파요','배고파요'],['🥤','목말라요','목말라요'],
+  ['🛏️','자세 바꿔','위치, 자세 조정해 주세요'],['💊','약 주세요','약 좀 주세요'],
+  ['🧑‍⚕️','의사 호출','의사 선생님 불러 주세요'],['👩‍⚕️','간호사 호출','간호사 불러 주세요'],
+  ['👨‍👩‍👧','가족','가족이 보고 싶어요'],['🥵','더워요','더워요'],['🥶','추워요','추워요'],
+  ['🤫','조용히','조용히 해 주세요'],['🙂','괜찮아요','괜찮아요'],['🙏','고마워요','고마워요'],['😴','잘게요','이제 잘게요']
+];
+
+/* --- ① 필요해요 --- */
+const NEED_MED = [
+  ['💉','주사','주사가 필요해요'],['💊','먹는 약','먹는 약 주세요'],['🩸','수액','수액이 필요해요'],
+  ['🧃','영양제','영양제가 필요해요'],['🚽','관장','관장이 필요해요'],['😮‍💨','가래약','가래약 주세요'],
+  ['😷','기침약','기침약 주세요'],['🤕','진통제','진통제 주세요'],['🌙','수면제','수면제 주세요'],
+  ['🍽️','소화제','소화제 주세요'],['🤢','진토제','토가 멈추는 약(진토제) 주세요'],
+  ['💩','변비약','변비약 주세요'],['🚻','지사제','설사 멈추는 약(지사제) 주세요']
+];
+const NEED_FOOD = [ ['🍚','식사','식사하고 싶어요'],['💧','물','물 주세요'] ];
+/* 물건: "OO 을/를 가져다주세요" 자동 생성 */
+const NEED_THINGS = [
+  ['📱','핸드폰'],['🔌','충전기'],['🦻','보청기'],['🙉','귀마개'],['👓','안경'],['🥼','환자복'],
+  ['🌀','선풍기'],['🛏️','침구'],['🖼️','가족사진'],['👕','옷'],['💍','귀중품'],['😴','수면안대'],
+  ['📻','라디오'],['📿','종교 물품'],['📖','책'],['🦷','틀니'],['✏️','종이와 연필'],['🎒','가방'],
+  ['🦽','휠체어'],['🚶','워커바'],['🗨️','의사소통판']
+].map(([e,l])=>[e,l,`${l}${eulreul(l)} 가져다주세요`]);
+const NEED_PEOPLE = [
+  ['🧑‍⚕️','의사','의사 선생님 불러 주세요'],['👩‍⚕️','간호사','간호사 불러 주세요'],
+  ['🤝','의사 면담','의사 면담을 하고 싶어요'],['✝️','성직자','성직자를 만나고 싶어요'],
+  ['🧒','자녀','자녀를 불러 주세요'],['👩','아내','아내를 불러 주세요'],
+  ['👨','남편','남편을 불러 주세요'],['👨‍👩‍👧','가족','가족을 불러 주세요']
+];
+const NEED_CARE = [
+  ['😮‍💨','가래 빼주세요','가래 빼주세요'],['🫁','산소 치료','산소 치료가 필요해요'],
+  ['🔪','수술·시술','수술(시술)이 필요해요'],['🩲','기저귀','기저귀 바꿔주세요'],
+  ['🛏️','자세 조정','위치, 자세 조정해 주세요']
+];
+const ENV = [
+  ['🌑','불 꺼주세요','불 꺼주세요'],['💡','불 켜주세요','불 켜주세요'],
+  ['🪟','커튼 열기','커튼 열어주세요'],['🚪','커튼 닫기','커튼 닫아주세요'],
+  ['🔕','알람 꺼주세요','알람 좀 꺼주세요'],['🥵','더워요','더워요'],['🥶','추워요','추워요'],
+  ['🔔','알람소리','알람소리가 신경 쓰여요'],['🙉','시끄러워요','시끄러워요'],
+  ['👃','냄새가 나요','냄새가 나요'],['🏜️','건조해요','공기가 건조해요'],['💦','습해요','공기가 습해요']
+];
+
+/* --- ② 궁금해요 --- */
+const ASK_WHEN = [
+  ['🕗','의사 회진','의사 회진은 언제인가요?'],['🔪','수술·시술','수술(시술)은 언제 하나요?'],
+  ['🩻','영상·정밀 검사','영상 검사(정밀 검사)는 언제 하나요?'],['🩸','혈액·체액 검사','혈액 검사(체액 검사)는 언제 하나요?'],
+  ['⏰','현재 시간','지금 몇 시인가요?'],['📅','오늘 날짜','오늘은 며칠인가요?']
+];
+const ASK_CARE = [
+  ['🚾','소변줄','소변줄은 언제 빼나요?'],['👃','콧줄','콧줄은 언제 빼나요?'],
+  ['💉','주사 삽입','이 주사는 무엇인가요?'],['🔪','수술·시술','수술(시술)에 대해 설명해 주세요'],
+  ['❤️','심장혈관 조영술','심장혈관 조영술에 대해 설명해 주세요'],['🫁','흉관 삽관','흉관 삽관에 대해 설명해 주세요']
+];
+const ASK_PROGRESS = [
+  ['➡️','다음 검사·치료','다음에 할 검사(치료)는 무엇이죠?'],['🏠','집에 언제','언제 집으로 갈 수 있나요?'],
+  ['🏥','병원 옮기나요','다른 병원으로 옮기나요?'],['🛏️','일반 병동','일반 병동으로 언제 가나요?']
+];
+const ASK_LIFE = [
+  ['🕗','의사 회진','의사 회진은 언제인가요?'],['👨‍👩‍👧','면회 시간','보호자 면회 시간은 언제인가요?'],
+  ['💵','병원비','병원비는 얼마나 나왔나요?'],['🅿️','주차','주차는 어떻게 하나요?']
+];
+
+/* --- ③ 도와주세요 --- */
+const HELP_BREATH = [
+  ['😮‍💨','가래 빼주세요','숨이 막혀요. 가래 빼주세요'],['🫁','산소 치료','숨이 막혀요. 산소 치료해 주세요'],
+  ['🫀','기관내삽관 확인','기관내삽관을 확인해 주세요'],['🤝','의사 면담','의사 선생님과 면담하고 싶어요'],
+  ['👃','콧줄 빼주세요','콧줄 빼주세요']
+];
+const HELP_REST = [
+  ['🙉','귀마개','귀마개 주세요'],['😴','수면안대','수면안대 주세요'],['🌙','수면제','수면제 주세요'],
+  ['🌑','불 꺼주세요','불 꺼주세요'],['💡','불 켜주세요','불 켜주세요'],
+  ['🪟','커튼 열기','커튼 열어주세요'],['🚪','커튼 닫기','커튼 닫아주세요'],
+  ['🔕','알람 꺼주세요','알람 좀 꺼주세요'],['🍚','식사','배고파요. 식사하고 싶어요'],['💧','물','물 주세요']
+];
+const HELP_BED = [
+  ['🚶','침대에서 나가기','침대에서 나오고 싶어요'],['⬆️','침대 머리 올려','침대 머리 올려주세요'],
+  ['⬇️','침대 머리 낮춰','침대 머리 낮춰주세요'],['🦵','다리 올려','다리 올려주세요'],
+  ['🦶','다리 내려','다리 내려주세요'],['⬅️','왼쪽으로','왼쪽으로 돌려주세요'],
+  ['➡️','오른쪽으로','오른쪽으로 돌려주세요'],['🛏️','자세 조정','위치, 자세 조정해 주세요']
+];
+const HELP_CLEAN = [
+  ['💛','소변 봤어요','소변 봤어요'],['💩','대변 봤어요','대변 봤어요'],['🩲','기저귀','기저귀 바꿔주세요'],
+  ['🛏️','침구 교체','침구가 더러워요. 바꿔주세요'],['🥼','환자복 교체','환자복이 젖었어요. 갈아입고 싶어요'],
+  ['✂️','보호대 풀기','신체 보호대 풀어주세요'],['👃','콧줄 빼주세요','콧줄 빼주세요'],
+  ['🚾','소변줄 빼주세요','소변줄 빼주세요']
+];
+
+/* --- ④ 불편해요 --- */
+const UNC_BODY = [
+  ['🤕','머리가 아파요','머리가 아파요'],['😣','아파요','아파요'],['🔴','부었어요','부었어요'],
+  ['😤','숨이 막혀요','숨이 막혀요'],['💓','가슴 답답','가슴이 답답해요'],['💫','어지러워요','어지러워요'],
+  ['🍽️','체했어요','체했어요'],['🤢','메스꺼워요','속이 메스꺼워요'],
+  ['💛','소변 봤어요','소변 봤어요'],['💩','대변 봤어요','대변 봤어요']
+];
+const UNC_HOW = [
+  ['⚡','쑤셔요','쑤셔요'],['🌫️','머리가 멍해요','머리가 멍해요'],['🔥','따가워요','따가워요'],
+  ['🗜️','조여와요','조여와요'],['👂','소리가 안들려요','소리가 잘 안들려요'],['🐜','간지러워요','간지러워요'],
+  ['⚡','저려요','저려요'],['🪫','힘이 빠져요','힘이 빠져요'],['👁️','눈 앞이 흐려요','눈 앞이 흐려요'],
+  ['🩸','피가 흘러요','피가 흘러요'],['💧','축축해요','축축해요'],['🌡️','열감이 있어요','열감이 있어요'],
+  ['🧱','눌려요','눌려요']
+];
+const UNC_FEELING = [
+  ['😢','우울·슬픔','우울하고 슬퍼요'],['😖','고통스러움','고통스러워요'],['😩','괴로움','괴로워요'],
+  ['😠','화남','화가 나요'],['😲','놀람','놀랐어요'],['😵','혼란스러움','혼란스러워요'],
+  ['😰','불안·걱정','불안하고 걱정돼요'],['😳','수치스러움','수치스러워요'],
+  ['🫥','무기력','무기력해요'],['😮‍💨','답답함','답답해요']
+];
+const UNC_CARE = [
+  ['🚫','금식','금식이 힘들어요'],['🚾','소변줄','소변줄이 불편해요'],['👃','콧줄','콧줄이 불편해요'],
+  ['🩹','상처·수술 부위','상처(수술) 부위가 불편해요'],['💉','주사부위','주사부위가 불편해요'],
+  ['🫀','기관내삽관','기관내삽관(목 호스) 때문에 아파요'],['🪢','신체 보호대','신체 보호대가 불편해요'],
+  ['🧱','모래주머니','모래주머니가 불편해요']
+];
+
+/* --- ⑤ 통증이 있어요 : 「어느 쪽 → 어디가 → 어떻게」 3단계 조합 --- */
+const PAIN_SIDE = [ ['➡️','오른쪽'],['⬅️','왼쪽'],['↔️','양쪽'],['❔','잘 모르겠어요',''] ];
+const PAIN_WHERE = [
+  ['🧠','머리'],['🗣️','목구멍'],['👁️','눈'],['👃','코'],['👄','입술'],['👂','귀'],
+  ['🧣','목'],['🫁','가슴'],['🫃','배'],['🔙','허리'],['💪','팔'],['✋','손'],
+  ['🦵','무릎'],['🦿','다리'],['🦶','발'],['💉','주사 부위'],['🩹','수술 부위']
+];
+/* p: 'ga'→이/가, 'e'→에, 'eseo'→에서 */
+const PAIN_HOW = [
+  ['😣','아파요','ga'],['⚡','쑤셔요','ga'],['🗡️','찌르듯이 아파요','ga'],['🗜️','조여와요','ga'],
+  ['🔥','따가워요','ga'],['⚡','저려요','ga'],['🐜','간지러워요','ga'],['🧱','눌려요','ga'],
+  ['🔴','부었어요','ga'],['🌡️','열감이 있어요','e'],['🩸','피가 흘러요','eseo']
+];
+
+const NUMS = ['1','2','3','4','5','6','7','8','9','10','시','분'];
+// 한글 자모 (스캐닝 부담을 줄인 기본 세트)
+const JAMO = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ',
+              'ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ','ㅜ','ㅠ','ㅡ','ㅣ','ㅐ','ㅔ'];
+
+/* ---------- 3. 상태 ---------- */
+const state = {
+  role:'solo',
+  level:'category',     // category | items | hangul
+  nodes:[],             // 현재 스캔 대상
+  idx:0,
+  timer:null,
+  speed:1400,
+  tts:true,
+  readScan:false,       // 시각 장애용: 스캔될 때 항목 내용을 읽어줌
+  sentence:'',          // 확정된 빠른문구/아이콘 문장(한글 입력과 별개로 합쳐서 표시)
+  pain:{side:'',where:''} // 통증 조합 임시 저장
+};
+
+/* ---------- 4. 노드(스캔 항목) 빌더 : 계층 탐색 스택 ---------- */
+const nav = { stack:[] };   // {builder, label, level?}
+function pushList(builder,label,level){ nav.stack.push({builder,label,level}); showTop(); }
+function popList(){ if(nav.stack.length>1) nav.stack.pop(); showTop(); }
+function goHome(){ nav.stack.length=1; showTop(); }
+function showTop(){
+  const top=nav.stack[nav.stack.length-1];
+  state.level = top.level || (nav.stack.length===1?'category':'items');
+  state.nodes = top.builder();
+  state.idx=0; renderTrack(); updateCrumb(); announceCurrent();
+  if(state.timer) startScan();               // 새 목록은 첫 칸부터 여유 있게
+}
+function crumbPath(){ return nav.stack.map(s=>s.label); }
+
+function backNode(){ return {emoji:'↩️',label:'뒤로',special:true,act:()=>popList()}; }
+function homeNode(){ return {emoji:'🏠',label:'처음으로',special:true,act:()=>goHome()}; }
+function itemNodes(arr){ return arr.map(([e,l,full])=>({emoji:e,label:l,type:'word',full:full||l})); }
+function catN(emoji,label,builder,level){ return {emoji,label,type:'cat',act:()=>pushList(builder,label,level),cat:true}; }
+
+/* --- 최상위: 스티커의 5대 의도 + 빠른말/한글/숫자/기능 --- */
+function nRoot(){
+  return [
+    {emoji:'💬',label:'자주 쓰는 말',type:'cat',cat:true,act:()=>pushList(nQuick,'자주 쓰는 말')},
+    {emoji:'🆘',label:'도와주세요',type:'cat',cat:true,act:()=>pushList(nHelp,'도와주세요')},
+    {emoji:'🤕',label:'통증이 있어요',type:'cat',cat:true,act:()=>startPain()},
+    {emoji:'😖',label:'불편해요',type:'cat',cat:true,act:()=>pushList(nUncomfort,'불편해요')},
+    {emoji:'🙏',label:'필요해요',type:'cat',cat:true,act:()=>pushList(nNeed,'필요해요')},
+    {emoji:'❓',label:'궁금해요',type:'cat',cat:true,act:()=>pushList(nAsk,'궁금해요')},
+    {emoji:'🔤',label:'한글로 쓰기',type:'cat',cat:true,act:()=>pushListHangul()},
+    {emoji:'🔢',label:'숫자',type:'cat',cat:true,act:()=>pushList(nNum,'숫자')},
+    ...customCatNodes(),
+    {emoji:'🗑️',label:'지우기',special:true,act:()=>{ clearAll(); }},
+    {emoji:'🔊',label:'다시 읽기',special:true,act:()=>{ speak(fullText()||'전할 말이 없습니다'); }},
+    {emoji:'📨',label:'문자 보내기',special:true,act:()=>{ sendSms(); }},
+    {emoji:'🚨',label:'비상 호출',special:true,act:()=>{ toggleSiren(); }},
+    {emoji:'🕘',label:'지난 말 보기',special:true,act:()=>{ openHist(); }},
+  ];
+}
+
+function nQuick(){ return [backNode(), ...itemNodes(QUICK)]; }
+
+/* ① 필요해요 → 약 / 음식 / 물건 / 사람·도움 / 처치·시술 / 환경 조정 */
+function nNeed(){
+  return [ backNode(),
+    catN('💊','약',()=>[backNode(),...itemNodes(NEED_MED)]),
+    catN('🍚','음식',()=>[backNode(),...itemNodes(NEED_FOOD)]),
+    catN('📦','물건',()=>[backNode(),...itemNodes(NEED_THINGS)]),
+    catN('🧑‍⚕️','사람·도움',()=>[backNode(),...itemNodes(NEED_PEOPLE)]),
+    catN('🩺','처치·시술',()=>[backNode(),...itemNodes(NEED_CARE)]),
+    catN('🌡️','환경 조정',()=>[backNode(),...itemNodes(ENV)]),
+  ];
+}
+
+/* ② 궁금해요 → 언제인가요 / 처치·시술 / 경과·상태 / 입원 생활 */
+function nAsk(){
+  return [ backNode(),
+    catN('⏰','언제인가요?',()=>[backNode(),...itemNodes(ASK_WHEN)]),
+    catN('🩺','처치·시술',()=>[backNode(),...itemNodes(ASK_CARE)]),
+    catN('📈','경과·상태',()=>[backNode(),...itemNodes(ASK_PROGRESS)]),
+    catN('🏥','입원 생활',()=>[backNode(),...itemNodes(ASK_LIFE)]),
+  ];
+}
+
+/* ③ 도와주세요 → 숨이 막혀요 / 잠·휴식 / 침대·자세 / 교체·위생 */
+function nHelp(){
+  return [ backNode(),
+    catN('😤','숨이 막혀요',()=>[backNode(),...itemNodes(HELP_BREATH)]),
+    catN('😴','잠·휴식·식사',()=>[backNode(),...itemNodes(HELP_REST)]),
+    catN('🛏️','침대·자세',()=>[backNode(),...itemNodes(HELP_BED)]),
+    catN('🧺','교체·위생',()=>[backNode(),...itemNodes(HELP_CLEAN)]),
+  ];
+}
+
+/* ④ 불편해요 → 몸 상태 / 어떻게 / 감정 / 처치·시술 / 주변 환경 */
+function nUncomfort(){
+  return [ backNode(),
+    catN('🤒','몸 상태',()=>[backNode(),...itemNodes(UNC_BODY)]),
+    catN('🌀','어떻게 불편한가요',()=>[backNode(),...itemNodes(UNC_HOW)]),
+    catN('💭','감정',()=>[backNode(),...itemNodes(UNC_FEELING)]),
+    catN('🩺','처치·시술',()=>[backNode(),...itemNodes(UNC_CARE)]),
+    catN('🌡️','주변 환경',()=>[backNode(),...itemNodes(ENV)]),
+  ];
+}
+
+/* ⑤ 통증이 있어요 : 어느 쪽 → 어디가 → 어떻게 (문장 자동 조합) */
+function startPain(){
+  state.pain={side:'',where:''};
+  pushList(nPainSide,'통증이 있어요');
+}
+function nPainSide(){
+  return [ backNode(),
+    ...PAIN_SIDE.map(([e,l,val])=>({emoji:e,label:l,special:false,type:'painSide',val:val===undefined?l:val})),
+  ];
+}
+function nPainWhere(){
+  return [ backNode(),
+    ...PAIN_WHERE.map(([e,l])=>({emoji:e,label:l,type:'painWhere',val:l})),
+  ];
+}
+function nPainHow(){
+  return [ backNode(),
+    ...PAIN_HOW.map(([e,l,p])=>({emoji:e,label:l,type:'painHow',val:l,p})),
+  ];
+}
+function composePain(how,p){
+  const side=state.pain.side?state.pain.side+' ':'';
+  const w=state.pain.where;
+  let josa = p==='e' ? '에' : p==='eseo' ? '에서' : iga(w);
+  const sent = `${side}${w}${josa} ${how}`;
+  addWord(sent);
+  addHistory(sent,'say');
+  goHome();
+}
+
+function nNum(){ return [backNode(), ...NUMS.map(s=>({label:s,type:'char',ch:s}))]; }
+function pushListHangul(){ pushList(nHangul,'한글로 쓰기','hangul'); }
+function nHangul(){
+  return [
+    backNode(),
+    ...JAMO.map(j=>({label:j,type:'jamo',jamo:j})),
+    {emoji:'␣',label:'띄어쓰기',special:true,act:()=>{ hangul.commit(); hangul.committed+=' '; sync(); }},
+    {emoji:'⌫',label:'한 글자 지움',special:true,act:()=>{ hangul.back(); sync(); }},
+    {emoji:'✅',label:'완성·읽기',special:true,act:()=>{ hangul.commit(); sync(); const t=fullText(); speak(t); addHistory(t,'say'); }},
+  ];
+}
+
+function buildCategory(){ nav.stack=[{builder:nRoot,label:'말 종류'}]; showTop(); }
+
+/* ---------- 5. 선택 처리 ---------- */
+function selectCurrent(){
+  const node=state.nodes[state.idx];
+  if(!node) return;
+  buzz();
+  if(node.type==='painSide'){ state.pain.side=node.val; flashTile(); speakScan(node.label); pushList(nPainWhere,'어디가 아픈가요'); return; }
+  if(node.type==='painWhere'){ state.pain.where=node.val; flashTile(); speakScan(node.label); pushList(nPainHow,'어떻게 아픈가요'); return; }
+  if(node.type==='painHow'){ flashTile(); composePain(node.val,node.p); return; }
+  if(node.act){ node.act(); flashTile(); return; }
+  if(node.type==='word'){ addWord(node.full); addHistory(node.full,'say'); goHome(); }
+  else if(node.type==='char'){ hangul.commit(); hangul.committed+=node.ch; sync(); flashTile(); return; } // 숫자는 이어서 고를 수 있게 유지
+  else if(node.type==='jamo'){ flashTile(); hangul.add(node.jamo); sync(); jumpAfterJamo(node.jamo); return; } // 자음↔모음 자동 점프
+  flashTile();
+}
+function addWord(full){
+  hangul.commit();
+  state.sentence = (state.sentence + ' ' + full).trim();
+  sync();
+  speak(full);
+}
+/* 한글 모드: 잡은 자모에 따라 다음에 필요한 구역으로 바로 점프
+   · 모음을 잡으면 → 자음 구역 (받침 또는 다음 글자 초성)
+   · 자음이 초성으로 들어가면 → 모음 구역
+   · 자음이 종성(받침)으로 들어가면 → 자음 구역 (다음 글자의 초성을 바로 잡도록)
+   → 트랙 전체를 다시 도는 시간을 없애 글자 조립 속도를 높임 */
+function jumpAfterJamo(justPicked){
+  if(state.level!=='hangul') return;
+  let wantVowel;
+  if(hangul.isVowel(justPicked)) wantVowel=false;           // 모음 다음엔 자음
+  else wantVowel = hangul.cur.jung < 0;                     // 조합 결과가 초성이면 모음, 종성(받침)이면 자음
+  const target = state.nodes.findIndex(n => n.type==='jamo' && hangul.isVowel(n.jamo)===wantVowel);
+  if(target<0) return;
+  state.idx = target;
+  [...track.children].forEach((c,i)=>c.classList.toggle('active',i===state.idx));
+  centerActive();
+  announceCurrent();
+  broadcastNow();
+  if(state.timer) startScan();                            // 점프한 칸부터 대기 시간을 새로 시작
+}
+function fullText(){ return (state.sentence + ' ' + hangul.text()).trim(); }
+
+function clearAll(){ state.sentence=''; hangul.reset(); sync(); toast('지웠어요'); }
+
+/* ---------- 6. 렌더링 ---------- */
+const track=document.getElementById('track');
+const crumbEl=document.getElementById('crumb');
+const sentenceEl=document.getElementById('sentence');
+
+function renderTrack(){
+  track.innerHTML='';
+  state.nodes.forEach((n,i)=>{
+    const t=document.createElement('div');
+    t.className='tile'+(n.special?' special':'')+(n.cat?' cat':'')+(i===state.idx?' active':'');
+    t.innerHTML=(n.img?`<img class="icon" src="${n.img}" alt="">`
+                 : n.emoji?`<div class="emoji">${n.emoji}</div>`:'')+`<div class="label">${n.label}</div>`;
+    t.onclick=()=>{ state.idx=i; renderTrack(); }; // (테스트용) 직접 탭도 가능
+    track.appendChild(t);
+  });
+  centerActive();
+}
+function centerActive(){
+  const el=track.children[state.idx];
+  if(el) el.scrollIntoView({inline:'center',block:'nearest'});
+}
+function step(){
+  state.idx=(state.idx+1)%state.nodes.length;
+  // active 클래스만 갱신(전체 재렌더 대신 가볍게)
+  [...track.children].forEach((c,i)=>c.classList.toggle('active',i===state.idx));
+  centerActive();
+  announceCurrent();
+  broadcastNow();
+}
+function flashTile(){
+  const el=track.children[state.idx];
+  if(!el) return;
+  el.animate([{boxShadow:'0 0 0 6px rgba(251,191,36,.7)'},{boxShadow:'0 0 0 0 rgba(251,191,36,0)'}],{duration:450});
+}
+function updateCrumb(){
+  const path=crumbPath();
+  if(path.length<=1){ crumbEl.innerHTML=`<b>말 종류를 고르세요</b>`; return; }
+  const html = path.map((p,i)=> i===path.length-1 ? `<b>${p}</b>` : `<span>${p}</span>`).join(' ▸ ');
+  const hint = state.level==='hangul' ? ' <span style="opacity:.7">· 잡으면 자음↔모음으로 자동 이동</span>' : '';
+  crumbEl.innerHTML = html + hint;
+}
+function sync(){
+  const txt=fullText();
+  if(txt){ sentenceEl.textContent=txt; sentenceEl.classList.remove('empty');
+           sentenceEl.insertAdjacentHTML('beforeend','<span class="caret"></span>'); }
+  else { sentenceEl.textContent='아직 만든 말이 없어요'; sentenceEl.classList.add('empty'); }
+  // 폰으로 문장 미러링
+  link.send({k:'sentence',text:txt});
+}
+
+/* ---------- 7. 음성 / 피드백 ---------- */
+function speak(text){
+  if(!state.tts||!text||!('speechSynthesis'in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='ko-KR'; u.rate=.95; u.pitch=1;
+  speechSynthesis.speak(u);
+}
+/* 시각 장애용: 현재 스캔 위치의 항목 내용을 빠르게 읽어줌 */
+function speakScan(text){
+  if(!state.readScan||!text||!('speechSynthesis'in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='ko-KR'; u.rate=1.2; u.pitch=1;
+  speechSynthesis.speak(u);
+}
+function announceCurrent(){ const n=state.nodes[state.idx]; if(n) speakScan(n.label); }
+function buzz(){ if(navigator.vibrate) navigator.vibrate(35); }
+let toastT;
+function toast(msg){
+  const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1300);
+}
+
+/* ---------- 7-2. 전화번호 등록 & SMS 전송 ---------- */
+let memPhone='';
+const phoneStore = {
+  get(){ try{ return localStorage.getItem('careTalkPhone')||''; }catch(_){ return memPhone; } },
+  set(v){ try{ localStorage.setItem('careTalkPhone',v); }catch(_){ memPhone=v; } }
+};
+function phoneNumber(){ return phoneStore.get().replace(/[^0-9+]/g,''); } // 발신용 정제
+function refreshPhoneUI(){
+  const raw=phoneStore.get();
+  document.getElementById('smsNum').textContent = raw ? '→ '+raw : '(번호 미등록)';
+  document.getElementById('phoneSettings').textContent = raw ? '📞 '+raw : '📞 번호 등록';
+}
+function openPhoneModal(){
+  document.getElementById('phoneInput').value = phoneStore.get();
+  document.getElementById('phoneModal').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('phoneInput').focus(),50);
+}
+function closePhoneModal(){ document.getElementById('phoneModal').classList.add('hidden'); }
+function savePhone(){
+  const v=document.getElementById('phoneInput').value.trim();
+  if(v && !/[0-9]{6,}/.test(v.replace(/[^0-9]/g,''))){ toast('번호를 확인해 주세요'); return; }
+  phoneStore.set(v); refreshPhoneUI(); closePhoneModal();
+  toast(v?'전화번호를 저장했어요':'번호를 비웠어요');
+}
+/* sms: 링크로 문자 앱을 번호·내용 채워 띄움 (사용자가 보내기) */
+function sendSms(){
+  const num=phoneNumber();
+  const text=fullText();
+  if(!num){ toast('먼저 전화번호를 등록하세요'); openPhoneModal(); return; }
+  if(!text){ toast('보낼 말이 없어요'); return; }
+  buzz();
+  const uri='sms:'+num+'?body='+encodeURIComponent(text);
+  const a=document.createElement('a'); a.href=uri; a.style.display='none';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('문자 앱을 엽니다 — 보내기를 누르세요');
+  speak('문자를 보냅니다');
+  addHistory(text,'sms');                       // 전송 기록 남김
+}
+
+/* ---------- 7-4. 전송 기록 (History, 최근 10건) ---------- */
+let memHist=[];
+const histStore = {
+  get(){ try{ return JSON.parse(localStorage.getItem('careTalkHist')||'[]'); }catch(_){ return memHist; } },
+  set(a){ try{ localStorage.setItem('careTalkHist',JSON.stringify(a)); }catch(_){ memHist=a; } }
+};
+function addHistory(text,via){
+  text=(text||'').trim(); if(!text) return;
+  const list=histStore.get();
+  list.unshift({ t:Date.now(), text, via:via||'say' });   // 최신이 맨 위
+  if(list.length>10) list.length=10;                       // 최근 10건만 유지
+  histStore.set(list);
+  if(!document.getElementById('histModal').classList.contains('hidden')) renderHistory();
+}
+function fmtTime(ts){
+  const d=new Date(ts), now=new Date();
+  const hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0');
+  const sameDay=d.toDateString()===now.toDateString();
+  const date=sameDay?'오늘':`${d.getMonth()+1}/${d.getDate()}`;
+  return `${date} ${hh}:${mm}`;
+}
+function renderHistory(){
+  const list=histStore.get();
+  const box=document.getElementById('histList');
+  if(!list.length){ box.innerHTML='<div class="hist-empty">아직 보낸 말이 없어요</div>'; return; }
+  box.innerHTML=list.map((h,i)=>`
+    <div class="hist-row">
+      <div class="hist-meta"><span class="hist-via">${h.via==='sms'?'📨':'🗣️'}</span><span class="hist-time">${fmtTime(h.t)}</span></div>
+      <div class="hist-text">${h.text.replace(/</g,'&lt;')}</div>
+      <div class="hist-acts">
+        <button class="hist-mini" data-reuse="${i}">↩︎ 다시쓰기</button>
+        <button class="hist-mini" data-resend="${i}">📨 다시보내기</button>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-reuse]').forEach(b=>b.onclick=()=>{
+    const h=histStore.get()[+b.dataset.reuse]; if(!h) return;
+    state.sentence=h.text; hangul.reset(); sync(); closeHist(); toast('말을 불러왔어요');
+  });
+  box.querySelectorAll('[data-resend]').forEach(b=>b.onclick=()=>{
+    const h=histStore.get()[+b.dataset.resend]; if(!h) return;
+    state.sentence=h.text; hangul.reset(); sync(); closeHist(); sendSms();
+  });
+}
+function openHist(){ document.getElementById('histModal').classList.remove('hidden'); renderHistory(); }
+function closeHist(){ document.getElementById('histModal').classList.add('hidden'); }
+function clearHist(){ histStore.set([]); renderHistory(); toast('기록을 모두 지웠어요'); }
+
+
+/* ============================================================
+   7-5. 엑셀 메뉴 가져오기
+   사용자가 만든 .xlsx 파일(텍스트 항목 + 행 위에 삽입한 아이콘 그림)을
+   읽어 사용자 정의 카테고리로 첫 화면에 추가합니다.
+   · 텍스트  : SheetJS(xlsx)로 파싱 — 열: 카테고리/텍스트/문장/이모지
+   · 그림    : JSZip으로 xlsx 내부(xl/drawings)를 직접 열어
+               그림이 걸린 행 번호로 항목과 자동 매칭
+   · 저장    : localStorage (그림은 72px로 축소해 용량 절약)
+   ============================================================ */
+let memCustom=[];
+const customStore={
+  get(){ try{ return JSON.parse(localStorage.getItem('careTalkCustomMenus')||'[]'); }catch(_){ return memCustom; } },
+  set(a){ try{ localStorage.setItem('careTalkCustomMenus',JSON.stringify(a)); }
+          catch(_){ memCustom=a; toast('저장 공간이 부족해 이번만 사용해요'); } }
+};
+
+/* 첫 화면에 붙는 사용자 카테고리 노드 */
+function customCatNodes(){
+  return customStore.get().map(cat=>({
+    emoji:cat.emoji||'📁', img:cat.img||null, label:cat.name, type:'cat', cat:true,
+    act:()=>pushList(()=>[
+      backNode(),
+      ...cat.items.map(it=>({emoji:it.emoji||(it.img?'':'🔹'), img:it.img||null,
+                             label:it.label, type:'word', full:it.full||it.label}))
+    ],cat.name)
+  }));
+}
+/* 첫 화면(루트)을 보고 있다면 목록 즉시 새로 고침 */
+function refreshRootIfHome(){
+  if(nav.stack.length===1 && !document.getElementById('app').classList.contains('hidden')) showTop();
+}
+
+/* --- 외부 라이브러리 지연 로드 --- */
+const _libs={};
+function loadLib(key,src,check){
+  if(check()) return Promise.resolve(true);
+  if(_libs[key]) return _libs[key];
+  _libs[key]=new Promise(res=>{
+    const s=document.createElement('script');
+    s.src=src; s.onload=()=>res(check()); s.onerror=()=>res(false);
+    document.head.appendChild(s);
+  });
+  return _libs[key];
+}
+const loadXLSX =()=>loadLib('xlsx','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',()=>!!window.XLSX);
+const loadJSZip=()=>loadLib('jszip','https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',()=>!!window.JSZip);
+
+/* --- 이미지 축소: 아이콘용 72px PNG 데이터 URL --- */
+function shrinkImage(blob,size=72){
+  return new Promise(res=>{
+    const url=URL.createObjectURL(blob), im=new Image();
+    im.onload=()=>{
+      try{
+        const c=document.createElement('canvas'); c.width=size; c.height=size;
+        const x=c.getContext('2d');
+        const r=Math.min(size/im.width,size/im.height);
+        const w=Math.max(1,Math.round(im.width*r)), h=Math.max(1,Math.round(im.height*r));
+        x.drawImage(im,(size-w)/2,(size-h)/2,w,h);
+        res(c.toDataURL('image/png'));
+      }catch(_){ res(null); }
+      URL.revokeObjectURL(url);
+    };
+    im.onerror=()=>{ URL.revokeObjectURL(url); res(null); };
+    im.src=url;
+  });
+}
+
+/* --- xlsx 내부에서 시트별 { 행번호(0기준) → 그림 데이터URL } 추출 --- */
+async function extractSheetImages(arrayBuffer){
+  const ok=await loadJSZip(); if(!ok) return {};
+  const zip=await JSZip.loadAsync(arrayBuffer);
+  const parse=async p=>{ const f=zip.file(p); if(!f) return null;
+    return new DOMParser().parseFromString(await f.async('string'),'application/xml'); };
+  const byLocal=(doc,name)=>doc?[...doc.getElementsByTagName('*')].filter(e=>e.localName===name):[];
+  const relTargets=doc=>{ const m={}; byLocal(doc,'Relationship').forEach(r=>m[r.getAttribute('Id')]=r.getAttribute('Target')); return m; };
+  const norm=(base,t)=>{ // ../drawings/drawing1.xml → xl/drawings/drawing1.xml
+    if(t.startsWith('/')) return t.slice(1);
+    const parts=(base+'/'+t).split('/'), out=[];
+    parts.forEach(p=>{ if(p==='..') out.pop(); else if(p!=='.'&&p!=='') out.push(p); });
+    return out.join('/');
+  };
+  // 시트 이름 ↔ 시트 파일 매핑
+  const wb=await parse('xl/workbook.xml'), wbRels=await parse('xl/_rels/workbook.xml.rels');
+  if(!wb||!wbRels) return {};
+  const rmap=relTargets(wbRels), result={};
+  for(const sh of byLocal(wb,'sheet')){
+    const name=sh.getAttribute('name');
+    const rid=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+    const sheetPath=norm('xl',rmap[rid]||''); if(!sheetPath) continue;
+    const relPath=sheetPath.replace(/worksheets\//,'worksheets/_rels/')+'.rels';
+    const shRels=await parse(relPath); if(!shRels) continue;
+    let drawTarget=null;
+    byLocal(shRels,'Relationship').forEach(r=>{ if(/\/drawing$/.test(r.getAttribute('Type')||'')) drawTarget=r.getAttribute('Target'); });
+    if(!drawTarget) continue;
+    const drawPath=norm(sheetPath.replace(/\/[^/]+$/,''),drawTarget);
+    const drawDoc=await parse(drawPath);
+    const drawRels=await parse(drawPath.replace(/drawings\//,'drawings/_rels/')+'.rels');
+    if(!drawDoc||!drawRels) continue;
+    const dmap=relTargets(drawRels), rows={};
+    for(const anchor of [...byLocal(drawDoc,'twoCellAnchor'),...byLocal(drawDoc,'oneCellAnchor')]){
+      const from=byLocal(anchor,'from')[0]; if(!from) continue;
+      const rowEl=byLocal(from,'row')[0]; if(!rowEl) continue;
+      const row=parseInt(rowEl.textContent,10);
+      const blip=byLocal(anchor,'blip')[0]; if(!blip) continue;
+      const embed=blip.getAttribute('r:embed')||blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','embed');
+      const media=dmap[embed]; if(!media) continue;
+      const mediaPath=norm(drawPath.replace(/\/[^/]+$/,''),media);
+      const mf=zip.file(mediaPath); if(!mf) continue;
+      const dataURL=await shrinkImage(new Blob([await mf.async('arraybuffer')]));
+      if(dataURL && rows[row]===undefined) rows[row]=dataURL;   // 같은 행 여러 그림이면 첫 그림
+    }
+    result[name]=rows;
+  }
+  return result;
+}
+
+/* --- 열 이름 유연 매칭 --- */
+function colIndex(header,names){
+  return header.findIndex(h=>{ h=String(h||'').replace(/\s/g,'').toLowerCase();
+    return names.some(n=>h===n||h.includes(n)); });
+}
+
+/* --- 메인: 엑셀 파일 → 사용자 카테고리 --- */
+async function importExcel(file){
+  const msg=document.getElementById('excelMsg');
+  msg.classList.add('hidden');
+  const ok=await loadXLSX();
+  if(!ok){ showExcelMsg('엑셀 라이브러리를 불러오지 못했어요 — 인터넷 연결을 확인하세요'); return; }
+  let buf; try{ buf=await file.arrayBuffer(); }catch(_){ showExcelMsg('파일을 읽지 못했어요'); return; }
+  let images={}; try{ images=await extractSheetImages(buf.slice(0)); }catch(_){ images={}; }
+  let wb; try{ wb=XLSX.read(buf,{type:'array'}); }catch(_){ showExcelMsg('엑셀 형식을 읽지 못했어요 (.xlsx 파일인지 확인)'); return; }
+
+  const cats={}, order=[];
+  wb.SheetNames.forEach(sheetName=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+    if(!rows.length) return;
+    // 제목 줄 찾기 ('텍스트' 열이 있는 첫 행, 없으면 0행을 제목으로 간주)
+    let hi=rows.findIndex(r=>colIndex(r,['텍스트','라벨','text','label'])>=0);
+    let cText,cCat,cFull,cEmoji;
+    if(hi>=0){
+      const h=rows[hi];
+      cText=colIndex(h,['텍스트','라벨','text','label']);
+      cCat =colIndex(h,['카테고리','분류','category']);
+      cFull=colIndex(h,['문장','말','sentence','full']);
+      cEmoji=colIndex(h,['이모지','emoji']);
+    } else { hi=-1; cText=0; cCat=-1; cFull=1; cEmoji=2; }   // 제목 줄 없이 값만 있는 파일
+    const imgRows=images[sheetName]||{};
+    for(let r=hi+1;r<rows.length;r++){
+      const row=rows[r];
+      const label=String(row[cText]!==undefined?row[cText]:'').trim();
+      if(!label) continue;
+      const catName=(cCat>=0?String(row[cCat]||'').trim():'')||sheetName;
+      const full=(cFull>=0?String(row[cFull]||'').trim():'')||label;
+      const emoji=(cEmoji>=0?String(row[cEmoji]||'').trim():'');
+      if(!cats[catName]){ cats[catName]={name:catName,items:[]}; order.push(catName); }
+      cats[catName].items.push({label,full,emoji,img:imgRows[r]||null});
+    }
+  });
+
+  const newCats=order.map(n=>cats[n]).filter(c=>c.items.length);
+  if(!newCats.length){ showExcelMsg('추가할 항목을 찾지 못했어요 — "텍스트" 열에 값이 있는지 확인하세요'); return; }
+
+  // 같은 이름 카테고리는 교체, 나머지는 뒤에 추가
+  const list=customStore.get();
+  newCats.forEach(nc=>{
+    nc.img=nc.items.find(i=>i.img)?.img||null;               // 카테고리 대표 아이콘
+    const i=list.findIndex(c=>c.name===nc.name);
+    if(i>=0) list[i]=nc; else list.push(nc);
+  });
+  customStore.set(list);
+  renderExcelList(); refreshRootIfHome();
+  const total=newCats.reduce((s,c)=>s+c.items.length,0);
+  const withImg=newCats.reduce((s,c)=>s+c.items.filter(i=>i.img).length,0);
+  toast(`메뉴 ${newCats.length}개 · 항목 ${total}개 추가${withImg?` (그림 ${withImg}개)`:''}`);
+  speak('엑셀 메뉴를 추가했어요');
+}
+function showExcelMsg(t){ const m=document.getElementById('excelMsg'); m.textContent=t; m.classList.remove('hidden'); }
+
+/* --- 불러온 메뉴 목록 UI --- */
+function renderExcelList(){
+  const list=customStore.get(), box=document.getElementById('excelList');
+  if(!list.length){ box.innerHTML='<div class="hist-empty">아직 불러온 메뉴가 없어요</div>'; return; }
+  box.innerHTML=list.map((c,i)=>{
+    const th=c.items.slice(0,4).map(it=>it.img?`<img src="${it.img}" alt="">`:`<span class="xe">${it.emoji||'🔹'}</span>`).join('');
+    return `<div class="xls-row">
+      <div class="xls-thumbs">${th}</div>
+      <div class="xn"><b>${c.name.replace(/</g,'&lt;')}</b><span>항목 ${c.items.length}개</span></div>
+      <button class="xls-del" data-xdel="${i}">삭제</button>
+    </div>`; }).join('');
+  box.querySelectorAll('[data-xdel]').forEach(b=>b.onclick=()=>{
+    const l=customStore.get(); l.splice(+b.dataset.xdel,1); customStore.set(l);
+    renderExcelList(); refreshRootIfHome(); toast('메뉴를 삭제했어요');
+  });
+}
+
+/* --- 양식 내려받기 --- */
+async function downloadTemplate(){
+  const ok=await loadXLSX();
+  if(!ok){ showExcelMsg('엑셀 라이브러리를 불러오지 못했어요 — 인터넷 연결을 확인하세요'); return; }
+  const rows=[
+    ['카테고리','텍스트','문장','이모지'],
+    ['내 요청','TV 켜줘','TV 좀 켜주세요','📺'],
+    ['내 요청','TV 꺼줘','TV 꺼주세요','📺'],
+    ['내 요청','안마','다리 좀 주물러 주세요','🦵'],
+    ['우리 가족','큰딸','큰딸에게 연락해 주세요','👧'],
+    ['우리 가족','아들','아들에게 연락해 주세요','👦'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:12},{wch:14},{wch:26},{wch:8}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'내 메뉴');
+  XLSX.writeFile(wb,'케어톡_메뉴_양식.xlsx');
+  toast('양식을 내려받았어요 — 그림은 행 위에 삽입하세요');
+}
+
+/* --- 모달 열기/닫기·바인딩 --- */
+function openExcelModal(){ document.getElementById('excelModal').classList.remove('hidden'); renderExcelList(); }
+function closeExcelModal(){ document.getElementById('excelModal').classList.add('hidden'); }
+document.getElementById('excelBtn').onclick=openExcelModal;
+document.getElementById('excelClose').onclick=closeExcelModal;
+document.getElementById('excelModal').addEventListener('click',e=>{ if(e.target.id==='excelModal') closeExcelModal(); });
+document.getElementById('excelTemplate').onclick=downloadTemplate;
+document.getElementById('excelPick').onclick=()=>document.getElementById('excelFile').click();
+document.getElementById('excelFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value='';
+  if(!f) return;
+  const btn=document.getElementById('excelPick'); btn.classList.add('busy');
+  await importExcel(f);
+  btn.classList.remove('busy');
+});
+document.getElementById('excelClearAll').onclick=()=>{
+  customStore.set([]); renderExcelList(); refreshRootIfHome(); toast('불러온 메뉴를 모두 지웠어요');
+};
+
+let sosOn=false, sosAudio=null, sosOsc=null, sosTimer=null, sosVibTimer=null;
+function sirenStart(){
+  if(sosOn) return; sosOn=true;
+  document.getElementById('sosBtn').classList.add('active');
+  try{
+    sosAudio=new (window.AudioContext||window.webkitAudioContext)();
+    sosOsc=sosAudio.createOscillator();
+    const g=sosAudio.createGain(); g.gain.value=.25;
+    sosOsc.type='sawtooth'; sosOsc.connect(g); g.connect(sosAudio.destination); sosOsc.start();
+    let hi=false;
+    const wail=()=>{ if(!sosOsc) return; sosOsc.frequency.setValueAtTime(hi?440:880,sosAudio.currentTime); hi=!hi; };
+    wail(); sosTimer=setInterval(wail,550);
+  }catch(_){}
+  if(navigator.vibrate){ const b=()=>navigator.vibrate([400,150]); b(); sosVibTimer=setInterval(b,600); }
+  speak('비상 호출. 도와주세요.');
+  link.send({k:'sos',on:true});               // 다른 기기로 전파
+  toast('🚨 비상 호출 중 — 다시 누르면 멈춥니다');
+}
+function sirenStop(){
+  if(!sosOn) return; sosOn=false;
+  document.getElementById('sosBtn').classList.remove('active');
+  clearInterval(sosTimer); clearInterval(sosVibTimer);
+  if(navigator.vibrate) navigator.vibrate(0);
+  try{ if(sosOsc){sosOsc.stop();sosOsc.disconnect();sosOsc=null;} if(sosAudio){sosAudio.close();sosAudio=null;} }catch(_){}
+  link.send({k:'sos',on:false});
+}
+function toggleSiren(){ sosOn?sirenStop():sirenStart(); }
+
+function startScan(){ stopScan(); state.timer=setInterval(step,state.speed); }
+function stopScan(){ if(state.timer) clearInterval(state.timer); state.timer=null; }
+function setSpeed(ms,from){
+  state.speed=Math.max(400,Math.min(4000,Math.round(ms)));
+  const sec=(state.speed/1000).toFixed(1);
+  if(from!=='range')  document.getElementById('speedRange').value=state.speed;
+  if(from!=='input')  document.getElementById('speedInput').value=sec;
+  if(state.timer) startScan();
+}
+
+/* 폰에 '지금 글자' 알려주기 */
+function broadcastNow(){
+  const n=state.nodes[state.idx]; if(!n) return;
+  link.send({k:'now',label:(n.emoji?n.emoji+' ':'')+n.label});
+}
+
+/* ---------- 9. 모드 부팅 ---------- */
+function boot(role){
+  state.role=role;
+  document.getElementById('roleScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  link.open();
+
+  const tag=document.getElementById('modeTag');
+  const flow=document.getElementById('flowRegion');
+  const controls=document.getElementById('controls');
+  const catchZone=document.getElementById('catchZone');
+  const mirror=document.getElementById('mirror');
+  const connState=document.getElementById('connState');
+  const sentenceWrap=document.getElementById('sentenceWrap');
+
+  if(role==='solo'){
+    tag.textContent='통합 (한 기기)';
+    mirror.classList.add('hidden'); connState.classList.add('hidden');
+    document.getElementById('connBtn').classList.add('hidden');
+    buildCategory(); startScan();
+    document.getElementById('catchHint').textContent='원하는 글자가 가운데로 오면 화면을 누르세요';
+    // 화면 어디든 탭하면 '잡기'
+    enableTapToCatch();
+  }
+  else if(role==='tablet'){
+    tag.textContent='태블릿 (디스플레이)';
+    catchZone.classList.add('hidden'); mirror.classList.add('hidden');
+    connState.classList.remove('hidden');
+    buildCategory(); startScan(); broadcastNow();
+    link.onMessage(m=>{
+      if(m.k==='catch'){ selectCurrent(); markConn(); }
+      if(m.k==='sos'){ m.on?sirenStart():sirenStop(); markConn(); }
+      if(m.k==='hello'){ markConn(); link.send({k:'sentence',text:fullText()}); broadcastNow(); }
+    });
+  }
+  else if(role==='phone'){
+    tag.textContent='폰 (잡기)';
+    flow.classList.add('hidden'); controls.classList.add('hidden');
+    mirror.classList.remove('hidden'); connState.classList.remove('hidden');
+    document.getElementById('catchHint').textContent='보이는 글자가 마음에 들 때 누르세요';
+    link.onMessage(m=>{
+      if(m.k==='sentence'){ phoneShowSentence(m.text); markConn(); }
+      if(m.k==='now'){ document.getElementById('mirrorBig').textContent=m.label||'—'; markConn(); }
+      if(m.k==='sos'){ m.on?sirenStart():sirenStop(); markConn(); }
+    });
+    link.send({k:'hello'});
+    setInterval(()=>{ if(!connOk) link.send({k:'hello'}); },1500);
+  }
+}
+
+let connOk=false, connT, transportLive=false;
+function markConn(){
+  connOk=true;
+  document.getElementById('connDot').classList.add('ok');
+  if(!transportLive) document.getElementById('connText').textContent='연결됨';
+  clearTimeout(connT); connT=setTimeout(()=>{ connOk=false;
+    if(!transportLive){
+      document.getElementById('connDot').classList.remove('ok');
+      document.getElementById('connText').textContent='연결 끊김';
+    }
+  },4000);
+}
+
+/* 전송(transport) 상태 → 헤더/모달 표시 갱신 */
+function applyConnStatus(stateName,label){
+  const kindEl=document.getElementById('connKind');
+  const textEl=document.getElementById('connText');
+  const dotEl =document.getElementById('connDot');
+  const mDot=document.getElementById('connModalDot');
+  const mText=document.getElementById('connModalText');
+  kindEl.textContent = label ? label+' · ' : '';
+  transportLive = (stateName==='connected');
+  let msg='대기';
+  if(stateName==='connected'){ msg='연결됨'; dotEl.classList.add('ok'); }
+  else if(stateName==='connecting'){ msg='연결 중…'; }
+  else if(stateName==='closed'){ msg='연결 끊김'; dotEl.classList.remove('ok'); }
+  else { /* ready */ if(!connOk) dotEl.classList.remove('ok'); }
+  textEl.textContent=msg;
+  if(mDot) mDot.classList.toggle('ok', stateName==='connected');
+  if(mText) mText.textContent = (label?label+' — ':'') + (stateName==='connected'?'연결됨'
+      : stateName==='connecting'?'연결 중…' : stateName==='closed'?'연결 끊김' : '연결 대기');
+}
+link.onStatus(applyConnStatus);
+function phoneShowSentence(text){
+  const s=document.getElementById('sentence');
+  if(text){ s.textContent=text; s.classList.remove('empty'); }
+  else { s.textContent='아직 만든 말이 없어요'; s.classList.add('empty'); }
+}
+
+/* 통합 모드: 화면 전체 탭 = 잡기 (버튼/컨트롤 제외) */
+function enableTapToCatch(){
+  document.getElementById('flowRegion').addEventListener('pointerdown',e=>{ e.preventDefault(); selectCurrent(); });
+}
+
+/* ---------- 10. 이벤트 바인딩 ---------- */
+document.querySelectorAll('.role-card').forEach(c=>c.addEventListener('click',()=>boot(c.dataset.role)));
+document.getElementById('backHome').onclick=()=>location.reload();
+
+document.getElementById('catchBtn').addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  if(state.role==='phone'){ buzz(); link.send({k:'catch'}); document.getElementById('catchBtn').animate(
+      [{transform:'scale(.97)'},{transform:'scale(1)'}],{duration:160}); }
+  else { selectCurrent(); }
+});
+document.getElementById('speedDown').onclick=()=>setSpeed(state.speed+200);
+document.getElementById('speedUp').onclick=()=>setSpeed(state.speed-200);
+document.getElementById('speedRange').addEventListener('input',e=>setSpeed(+e.target.value,'range'));
+document.getElementById('speedInput').addEventListener('input',e=>{
+  const v=parseFloat(e.target.value); if(!isNaN(v)) setSpeed(v*1000,'input');
+});
+document.getElementById('sosBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); toggleSiren(); });
+
+/* 전송 기록 */
+document.getElementById('histBtn').onclick=openHist;
+document.getElementById('histClose').onclick=closeHist;
+document.getElementById('histClear').onclick=clearHist;
+document.getElementById('histModal').addEventListener('click',e=>{ if(e.target.id==='histModal') closeHist(); });
+document.getElementById('ttsToggle').onclick=()=>{
+  state.tts=!state.tts;
+  document.getElementById('ttsState').textContent=state.tts?'켬':'끔';
+  document.getElementById('ttsToggle').classList.toggle('on',state.tts);
+  if(state.tts) speak('읽어주기를 켰습니다');
+};
+document.getElementById('scanReadToggle').onclick=()=>{
+  state.readScan=!state.readScan;
+  document.getElementById('scanReadState').textContent=state.readScan?'켬':'끔';
+  document.getElementById('scanReadToggle').classList.toggle('on',state.readScan);
+  if(state.readScan){
+    if(state.speed<1200) setSpeed(1200);          // 들을 시간을 위해 너무 빠르면 늦춤
+    speakScan('스크롤 읽기를 켰습니다');
+  } else if('speechSynthesis'in window){ speechSynthesis.cancel(); }
+};
+
+/* 키보드 접근성: 스페이스/엔터 = 잡기 (보조 스위치 호환) */
+window.addEventListener('keydown',e=>{
+  if(document.getElementById('app').classList.contains('hidden')) return;
+  if(e.target.tagName==='INPUT') return;                         // 번호 입력 중엔 무시
+  if(document.querySelector('.modal-bg:not(.hidden)')) return; // 모달 열림 중 무시
+  if(e.code==='Space'||e.code==='Enter'){
+    e.preventDefault();
+    if(state.role==='phone') link.send({k:'catch'});
+    else selectCurrent();
+  }
+});
+
+/* ============================================================
+   연결(근접 페어링) 패널 — 같은기기 / WiFi(WebRTC) / 블루투스(BLE)
+   ============================================================ */
+
+/* 공통: 토스트·복사·QR·스캔 ------------------------------------ */
+function copyText(str){
+  if(!str){ toast('복사할 코드가 없어요'); return; }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(str).then(()=>toast('코드를 복사했어요'))
+      .catch(()=>toast('길게 눌러 코드를 복사하세요'));
+  } else toast('길게 눌러 코드를 복사하세요');
+}
+
+let qrLibPromise=null;
+function loadQRLib(){
+  if(window.QRCode) return Promise.resolve(true);
+  if(qrLibPromise) return qrLibPromise;
+  qrLibPromise=new Promise(res=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=()=>res(!!window.QRCode); s.onerror=()=>res(false);
+    document.head.appendChild(s);
+  });
+  return qrLibPromise;
+}
+async function showQR(cardEl,text){
+  cardEl.classList.remove('on'); cardEl.innerHTML='';
+  const ok=await loadQRLib();
+  if(!ok||!window.QRCode) return false;          // 오프라인 등: QR 생략, 코드 복사로 진행
+  try{
+    new QRCode(cardEl,{text, width:200, height:200, correctLevel:QRCode.CorrectLevel.L});
+    cardEl.classList.add('on'); return true;
+  }catch(_){ cardEl.innerHTML=''; return false; } // 코드가 너무 길면 QR 생략
+}
+
+/* QR 스캔 (안드로이드 크롬 등 BarcodeDetector 지원 기기) */
+let scanStream=null, scanRAF=null;
+async function startQRScan(targetInput){
+  const cam=document.getElementById('scanCam');
+  if(!('BarcodeDetector' in window)){ toast('이 기기는 QR 스캔 미지원 — 코드를 붙여넣어 주세요'); return; }
+  let det; try{ det=new BarcodeDetector({formats:['qr_code']}); }catch(_){ toast('QR 스캔을 쓸 수 없어요'); return; }
+  try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); }
+  catch(_){ toast('카메라를 열 수 없어요'); return; }
+  cam.srcObject=scanStream; cam.classList.add('on'); try{ await cam.play(); }catch(_){}
+  const tick=async()=>{
+    if(!scanStream) return;
+    try{ const codes=await det.detect(cam);
+      if(codes&&codes.length){ targetInput.value=codes[0].rawValue.trim(); stopQRScan(); toast('QR을 읽었어요'); return; }
+    }catch(_){}
+    scanRAF=requestAnimationFrame(tick);
+  };
+  scanRAF=requestAnimationFrame(tick);
+}
+function stopQRScan(){
+  const cam=document.getElementById('scanCam'); cam.classList.remove('on');
+  if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF=null; }
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+  cam.srcObject=null;
+}
+
+/* 모달 열고/닫기 + 탭 ----------------------------------------- */
+function openConnModal(){ document.getElementById('connModal').classList.remove('hidden'); }
+function closeConnModal(){ document.getElementById('connModal').classList.add('hidden'); stopQRScan(); }
+document.getElementById('connBtn').onclick=openConnModal;
+document.getElementById('connModalClose').onclick=closeConnModal;
+document.getElementById('connModal').addEventListener('click',e=>{ if(e.target.id==='connModal') closeConnModal(); });
+
+document.querySelectorAll('.conn-tab').forEach(tab=>tab.onclick=()=>{
+  stopQRScan();
+  document.querySelectorAll('.conn-tab').forEach(t=>t.classList.toggle('on',t===tab));
+  const m=tab.dataset.method;
+  document.querySelectorAll('.conn-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===m));
+});
+
+/* 같은 기기 ---------------------------------------------------- */
+document.getElementById('chUse').onclick=async()=>{
+  await link.use('channel');
+  link.send({k:'hello'});
+  toast('같은 기기 방식으로 연결했어요');
+};
+
+/* WiFi : 초대/참여 탭 ----------------------------------------- */
+function wifiShowStep(which){
+  document.getElementById('wifiHostTab').classList.toggle('on',which==='host');
+  document.getElementById('wifiGuestTab').classList.toggle('on',which==='guest');
+  document.querySelectorAll('#connModal [data-step]').forEach(s=>s.classList.toggle('on',s.dataset.step===which));
+}
+document.getElementById('wifiHostTab').onclick=()=>{ stopQRScan(); wifiShowStep('host'); };
+document.getElementById('wifiGuestTab').onclick=()=>{ stopQRScan(); wifiShowStep('guest'); };
+
+function busy(btn,on){ btn.classList.toggle('busy',on); }
+
+/* 호스트: 초대 코드 만들기 */
+document.getElementById('wifiMakeInvite').onclick=async(e)=>{
+  const btn=e.currentTarget; busy(btn,true);
+  try{
+    await link.use('wifi');
+    const code=await link.tx.createInvite();
+    document.getElementById('wifiInviteCode').value=code;
+    showQR(document.getElementById('wifiInviteQR'),code);
+    toast('초대 코드를 만들었어요 — 상대에게 보여주세요');
+  }catch(err){ toast('초대 코드 생성 실패'); }
+  busy(btn,false);
+};
+document.getElementById('wifiInviteCopy').onclick=()=>copyText(document.getElementById('wifiInviteCode').value);
+document.getElementById('wifiAnswerScan').onclick=()=>startQRScan(document.getElementById('wifiAnswerIn'));
+/* 호스트: 상대 응답코드 적용 → 연결 완료 */
+document.getElementById('wifiFinish').onclick=async(e)=>{
+  const code=document.getElementById('wifiAnswerIn').value.trim();
+  if(!code){ toast('상대의 응답 코드를 먼저 붙여넣으세요'); return; }
+  if(link.kind()!=='wifi'){ toast('먼저 초대 코드를 만들어 주세요'); return; }
+  const btn=e.currentTarget; busy(btn,true);
+  try{ await link.tx.applyAnswer(code); link.send({k:'hello'}); toast('연결을 시도합니다…'); }
+  catch(err){ toast('응답 코드를 확인해 주세요'); }
+  busy(btn,false);
+};
+
+/* 게스트: 초대코드로 응답코드 만들기 */
+document.getElementById('wifiInviteScan').onclick=()=>startQRScan(document.getElementById('wifiInviteIn'));
+document.getElementById('wifiMakeAnswer').onclick=async(e)=>{
+  const code=document.getElementById('wifiInviteIn').value.trim();
+  if(!code){ toast('상대의 초대 코드를 먼저 붙여넣으세요'); return; }
+  const btn=e.currentTarget; busy(btn,true);
+  try{
+    await link.use('wifi');
+    const ans=await link.tx.joinWith(code);
+    document.getElementById('wifiAnswerCode').value=ans;
+    showQR(document.getElementById('wifiAnswerQR'),ans);
+    link.send({k:'hello'});
+    toast('응답 코드를 만들었어요 — 상대에게 보여주세요');
+  }catch(err){ toast('초대 코드를 확인해 주세요'); }
+  busy(btn,false);
+};
+document.getElementById('wifiAnswerCopy').onclick=()=>copyText(document.getElementById('wifiAnswerCode').value);
+
+/* 블루투스 ---------------------------------------------------- */
+document.getElementById('btScan').onclick=async(e)=>{
+  const btn=e.currentTarget, msg=document.getElementById('btMsg');
+  msg.style.display='none'; busy(btn,true);
+  try{
+    await link.use('bluetooth');
+    link.send({k:'hello'});
+    toast('블루투스로 연결했어요');
+  }catch(err){
+    msg.style.display='block';
+    msg.textContent = (err&&err.message) ? err.message : '연결되지 않았어요. CareTalk-R4(UNO R4) 등 케어톡 BLE 서비스를 켠 기기가 켜져 있는지 확인하세요.';
+  }
+  busy(btn,false);
+};
+
+/* 시리얼(Web Serial) ------------------------------------------- */
+document.getElementById('serialConnect').onclick=async(e)=>{
+  const btn=e.currentTarget, msg=document.getElementById('serialMsg');
+  msg.style.display='none'; busy(btn,true);
+  try{
+    await link.use('serial');
+    link.send({k:'hello'});
+    document.getElementById('serialDisconnect').style.display='';
+    toast('시리얼 장치와 연결했어요 (115200bps)');
+  }catch(err){
+    msg.style.display='block';
+    msg.textContent = (err&&err.name==='NotFoundError') ? '포트를 선택하지 않았어요.'
+      : (err&&err.message) ? err.message
+      : '연결 실패 — 다른 프로그램(시리얼 모니터 등)이 포트를 사용 중인지 확인하세요.';
+  }
+  busy(btn,false);
+};
+document.getElementById('serialDisconnect').onclick=async(e)=>{
+  e.currentTarget.style.display='none';
+  await link.use('channel');            // 기본(같은 기기) 전송으로 복귀
+  toast('시리얼 연결을 해제했어요');
+};
+
+/* ============================================================ */
+
+/* SMS / 전화번호 등록 */
+document.getElementById('smsBtn').onclick=sendSms;
+document.getElementById('phoneSettings').onclick=openPhoneModal;
+document.getElementById('phoneSave').onclick=savePhone;
+document.getElementById('phoneCancel').onclick=closePhoneModal;
+document.getElementById('phoneModal').addEventListener('click',e=>{ if(e.target.id==='phoneModal') closePhoneModal(); });
+document.getElementById('phoneInput').addEventListener('keydown',e=>{ if(e.key==='Enter') savePhone(); });
+
+setSpeed(1400);
+document.getElementById('ttsToggle').classList.add('on');
+refreshPhoneUI();
+</script>
+</body>
+</html>
